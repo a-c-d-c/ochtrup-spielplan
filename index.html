@@ -2591,7 +2591,7 @@ async function showTable(team) {
   const allGroupMatches = parseLeagueAll(html, league);
   let schedHtml = '<div class="detail-schedule-title">Spielplan der Gruppe</div>';
   for (const m of allGroupMatches) {
-    const past = isPast(m.date);
+    const past = isPast(m.date) || /^\d+:\d+$/.test(m.result || '');
     const wd   = WEEKDAYS[m.date.getDay()];
     const homeCls = m.isClubMatch ? (m.isHome  ? 'detail-schedule-own' : 'detail-schedule-opp') : 'detail-schedule-neutral';
     const awayCls = m.isClubMatch ? (!m.isHome ? 'detail-schedule-own' : 'detail-schedule-opp') : 'detail-schedule-neutral';
