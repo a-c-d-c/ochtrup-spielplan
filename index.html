@@ -698,9 +698,10 @@
   .report-table td:nth-child(4) { text-align: left; color: #e8eaf0; }
   .report-table tr.total-row td { color: #fff; font-weight: 700; border-top: 1px solid #3a3f5c; border-bottom: none; text-align: center; }
   .report-table tr.club-player td { color: #fff; }
-  .set-win  { color: #28a856; font-weight: 600; }
-  .set-loss { color: #e03838; }
-  .set-draw { color: #d4a000; font-weight: 600; }
+  .set-win     { color: #28a856; font-weight: 600; }
+  .set-loss    { color: #e03838; }
+  .set-draw    { color: #d4a000; font-weight: 600; }
+  .set-neutral { color: #9095b0; }
 
   .card-tag-row {
     text-align: center;
@@ -2723,12 +2724,13 @@ function showTableFromReport() {
 
 function renderReport(html, m) {
   const doc = new DOMParser().parseFromString(html, 'text/html');
+  const clubCtx = m.isClubMatch !== false;
   let out = '';
 
   /* ── Header ── */
   out += `<div class="report-match-header">
     <div class="report-teams">${esc(m.homeTeam)} <span style="color:#555a7a">vs.</span> ${esc(m.awayTeam)}</div>
-    <div class="report-result ${m.isClubMatch ? resultCls(m.result, m.isHome) : 'neutral'}">${m.result}</div>
+    <div class="report-result ${clubCtx ? resultCls(m.result, m.isHome) : 'neutral'}">${m.result}</div>
     <div class="report-date">${WEEKDAYS[m.date.getDay()]} ${m.dateStr} · ${m.timeStr} Uhr · ${m.label}</div>
   </div>`;
 
@@ -2813,7 +2815,7 @@ function renderReport(html, m) {
               const t = sc.textContent.trim();
               if (/^\d+:\d+$/.test(t)) {
                 const [a, b] = t.split(':').map(Number);
-                const setCls = a === b ? 'set-draw' : (m.isHome ? a > b : b > a) ? 'set-win' : 'set-loss';
+                const setCls = !clubCtx ? 'set-neutral' : a === b ? 'set-draw' : (m.isHome ? a > b : b > a) ? 'set-win' : 'set-loss';
                 out += `<td><span class="${setCls}">${esc(t)}</span></td>`;
               } else {
                 out += `<td>${esc(t)}</td>`;
@@ -2836,7 +2838,7 @@ function renderReport(html, m) {
           let txt = esc(origTxt);
           if (/^\d+:\d+$/.test(origTxt)) {
             const [a, b] = origTxt.split(':').map(Number);
-            const setCls = a === b ? 'set-draw' : (m.isHome ? a > b : b > a) ? 'set-win' : 'set-loss';
+            const setCls = !clubCtx ? 'set-neutral' : a === b ? 'set-draw' : (m.isHome ? a > b : b > a) ? 'set-win' : 'set-loss';
             txt = `<span class="${setCls}">${txt}</span>`;
           }
           return `<td${cs}>${txt}</td>`;
