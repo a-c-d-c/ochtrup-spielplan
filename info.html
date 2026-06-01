@@ -50,6 +50,8 @@
   .acc-feature-list { list-style: none; padding: 0; margin: 0; }
   .acc-feature-list li { margin-bottom: 10px; }
   .acc-feature-label { font-weight: 700; }
+  #acc-statistik.open { max-height: 8000px; }
+  #acc-mannschaft.open { max-height: 2000px; }
 </style>
 
 <div class="accordion-item">
@@ -142,6 +144,34 @@
         <li>Aktiviere <strong>Vorbei</strong>, <strong>Heim</strong> und <strong>Auswärts</strong></li>
         <li>Tippe auf ein <strong>Ergebnis</strong> für den Spielbericht oder auf <strong>Tabelle</strong> für die Tabelle</li>
       </ol>
+    </div>
+  </div>
+</div>
+
+<div class="accordion-item">
+  <button class="accordion-btn" data-target="acc-statistik"
+    onclick="toggleAccordion('acc-statistik'); loadStatistik();">
+    Spielerstatistik
+    <span class="accordion-arrow">▼</span>
+  </button>
+  <div class="accordion-body" id="acc-statistik">
+    <div class="accordion-body-inner">
+      <div id="statistik-container">
+        <div class="loading-row"><div class="spinner"></div>Wird beim Öffnen geladen …</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="accordion-item">
+  <button class="accordion-btn" data-target="acc-mannschaft"
+    onclick="toggleAccordion('acc-mannschaft'); loadMannschaft();">
+    Mannschaftsstatistik
+    <span class="accordion-arrow">▼</span>
+  </button>
+  <div class="accordion-body" id="acc-mannschaft">
+    <div class="accordion-body-inner">
+      <div id="mannschaft-container"></div>
     </div>
   </div>
 </div>

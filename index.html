@@ -703,6 +703,27 @@
   .set-draw    { color: #d4a000; font-weight: 600; }
   .set-neutral { color: #9095b0; }
 
+  /* ── Statistik-Tabelle ── */
+  #statistik-container { overflow-x: auto; -webkit-overflow-scrolling: touch; margin-top: 4px; }
+  .stat-table { width: 100%; border-collapse: collapse; font-size: 0.78rem; }
+  .stat-table th {
+    padding: 7px 6px; text-align: left;
+    font-size: 0.68rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.05em; color: #7a7f96;
+    border-bottom: 1px solid #252840; white-space: nowrap;
+  }
+  .stat-table th.sortable { cursor: pointer; user-select: none; }
+  .stat-table th.sortable:hover { color: #c8cade; }
+  .stat-table th.sort-asc::after  { content: ' ▲'; font-size: 0.6em; opacity: 0.8; }
+  .stat-table th.sort-desc::after { content: ' ▼'; font-size: 0.6em; opacity: 0.8; }
+  .stat-table td { padding: 7px 6px; color: #c8cad8; border-bottom: 1px solid rgba(144,149,176,0.08); white-space: nowrap; }
+  .stat-table td:first-child { color: #e8eaf0; white-space: normal; min-width: 100px; }
+  .stat-table tr:last-child td { border-bottom: none; }
+  .stat-rank-btn { background: none; border: none; padding: 0; cursor: pointer; color: #7ec8e3; font-size: 0.78rem; font-family: inherit; text-decoration: underline; text-underline-offset: 2px; }
+  .stat-diff-pos  { color: #28a856; font-weight: 600; }
+  .stat-diff-neg  { color: #e03838; }
+  .stat-diff-zero { color: #9095b0; }
+
   .card-tag-row {
     text-align: center;
     margin-bottom: 14px;
@@ -865,6 +886,21 @@
 </style>
 <style id="theme-override-css"></style>
 <style id="dynamic-team-css"></style>
+<style id="info-always-dark-css">
+  #info-view { background: #0f1117 !important; color: #c8cade !important; }
+  #info-view #btn-info-back { color: #ffffff !important; }
+  #info-view .info-content { color: #c8cade !important; }
+  #info-view .info-content h2 { color: #ffffff !important; }
+  #info-view .info-content a { color: #8aadd4 !important; }
+  #info-view #info-donate { background: rgba(255,255,255,0.04) !important; border-color: rgba(144,149,176,0.15) !important; }
+  #info-view .donate-text { color: #9095b0 !important; }
+  #info-view .btn-amount { color: #9095b0 !important; border-color: rgba(144,149,176,0.3) !important; background: transparent !important; }
+  #info-view .btn-amount.on { color: #ffffff !important; border-color: rgba(144,149,176,0.7) !important; background: rgba(144,149,176,0.15) !important; }
+  #info-view #donate-custom-input-info { background: rgba(255,255,255,0.06) !important; color: #c8cade !important; border-color: rgba(144,149,176,0.3) !important; }
+  #info-view .donate-custom-euro { color: #9095b0 !important; }
+  #info-view .status-msg { color: #9095b0 !important; }
+  #info-view .loading-row { color: #9095b0 !important; }
+</style>
 </head>
 <body>
 
@@ -3029,6 +3065,318 @@ if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
   };
   img.src = 'logo2.png';
 })();
+
+/* ── Statistik ─────────────────────────────────────────────── */
+let _statistikData = null;
+let _statistikSort = { col: 'gesamt', dir: -1 };
+
+async function loadStatistik() {
+  const container = document.getElementById('statistik-container');
+  if (!container) return;
+  if (container.dataset.loaded === '1') { if (_statistikData) renderStatistikTable(container); return; }
+  container.dataset.loaded = '1';
+  container.innerHTML = '<div class="loading-row"><div class="spinner"></div>Daten werden geladen …</div>';
+
+  try {
+    const reportMatches = allMatches.filter(m => m.reportUrl && /^\d+:\d+$/.test(m.result || ''));
+    const LK_BASE = 'https://wtv.liga.nu/cgi-bin/WebObjects/nuLigaTENDE.woa/wa/clubRankinglistLK?federation=WTV&club=2015325';
+
+    const [lkHerren, lkDamen, ...reportResults] = await Promise.all([
+      fetchURL(LK_BASE + '&gender=1').catch(() => ''),
+      fetchURL(LK_BASE + '&gender=0').catch(() => ''),
+      ...reportMatches.map(m => fetchURL(m.reportUrl).catch(() => null))
+    ]);
+
+    const playerMap = parseLKList(lkHerren);
+    Object.assign(playerMap, parseLKList(lkDamen));
+
+    for (let i = 0; i < reportMatches.length; i++) {
+      if (reportResults[i]) parseReportStats(reportResults[i], reportMatches[i], playerMap);
+    }
+
+    _statistikData = Object.values(playerMap)
+      .filter(p => p.lk !== '–' && p.einzelWins + p.einzelLosses + p.doppelWins + p.doppelLosses > 0);
+
+    renderStatistikTable(container);
+  } catch(e) {
+    container.innerHTML = '<div class="status-msg">Statistik konnte nicht geladen werden.</div>';
+    container.dataset.loaded = '';
+  }
+}
+
+function parseLKList(html) {
+  // Table columns: 0=DGR, 1=LK, 2=ID, 3=Name (Jahrgang), 4=Bemerkung, 5=Nation, 6=Stichtags LK
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  const map = {};
+  doc.querySelectorAll('table tr').forEach(row => {
+    if (row.querySelectorAll('th').length) return;
+    const cells = [...row.cells];
+    if (cells.length < 4) return;
+    const lkRaw   = cells[1].textContent.trim();
+    const cellTxt = cells[3].textContent.replace(/\s+/g, ' ').trim();
+    const lkM = lkRaw.match(/^LK(\d{1,2}(?:[.,]\d)?)$/);
+    if (!lkM || !cellTxt.includes(',')) return;
+    const lk          = lkM[1].replace(',', '.');
+    const name        = cellTxt.replace(/\s*\(\d{4}\)\s*$/, '').trim();
+    const yearM       = cellTxt.match(/\((\d{4})\)/);
+    const displayName = yearM ? `${name} (${yearM[1]})` : name;
+    if (name) map[_normName(name)] = { name: displayName, lk, einzelWins: 0, einzelLosses: 0, doppelWins: 0, doppelLosses: 0 };
+  });
+  return map;
+}
+
+function parseReportStats(html, match, playerMap) {
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  const tables = [...doc.querySelectorAll('table')].filter(t =>
+    (t.textContent.includes('Satz') || t.textContent.includes('LK')) && t.rows.length > 1
+  );
+  if (!tables.length) return;
+
+  let section = null;
+  for (const row of tables[0].rows) {
+    const cells = [...row.cells];
+    if (cells.length === 1) {
+      const t = cells[0].textContent.trim().toLowerCase();
+      if (t === 'einzelspiele') { section = 'einzel'; continue; }
+      if (t === 'doppelspiele') { section = 'doppel'; continue; }
+    }
+    if (!section || row.querySelectorAll('th').length) continue;
+    const lbl = cells[0]?.textContent.trim() || '';
+    if (/^(einzel|doppel|gesamt)$/i.test(lbl)) continue;
+    if (section === 'einzel') _parseEinzel(cells, match, playerMap);
+    else _parseDoppel(cells, match, playerMap);
+  }
+}
+
+function _parseEinzel(cells, match, playerMap) {
+  const nameCells = cells
+    .map(c => c.textContent.trim())
+    .filter(t => t.includes(',') && /[a-zA-ZäöüÄÖÜß]{2}/.test(t));
+  if (nameCells.length < 2) return;
+
+  const name = _extractName(match.isHome ? nameCells[0] : nameCells[1]);
+  if (!name) return;
+
+  const scores = cells.map(c => c.textContent.trim()).filter(t => /^\d+:\d+$/.test(t));
+  if (!scores.length) return;
+
+  let cw = 0, ow = 0;
+  scores.forEach(s => { const [a, b] = s.split(':').map(Number); (match.isHome ? a > b : b > a) ? cw++ : ow++; });
+  _addStat(playerMap, name, 'einzel', cw > ow);
+}
+
+function _parseDoppel(cells, match, playerMap) {
+  if (cells.length < 8) return;
+  const filtered = cells.filter((_, i) => i !== 1 && i !== 4);
+  const homeTxt = filtered[1]?.textContent || '';
+  const awayTxt = filtered[3]?.textContent || '';
+  const clubTxt = match.isHome ? homeTxt : awayTxt;
+
+  const players = clubTxt.split('\n')
+    .map(s => s.replace(/\s*\(\d+\)\s*/g, '').trim())
+    .filter(s => s.includes(',') && /[a-zA-ZäöüÄÖÜß]{2}/.test(s));
+  if (!players.length) return;
+
+  const scores = filtered.slice(4).map(c => c.textContent.trim()).filter(t => /^\d+:\d+$/.test(t));
+  if (!scores.length) return;
+
+  let cw = 0, ow = 0;
+  scores.forEach(s => { const [a, b] = s.split(':').map(Number); (match.isHome ? a > b : b > a) ? cw++ : ow++; });
+  const won = cw > ow;
+  players.forEach(raw => {
+    const name = _extractName(raw);
+    if (name) _addStat(playerMap, name, 'doppel', won);
+  });
+}
+
+function _extractName(txt) {
+  txt = txt.replace(/^\d+\s*/, '').split('\n')[0].trim();
+  const pi = txt.indexOf('(');
+  let name = (pi >= 0 ? txt.slice(0, pi) : txt).trim();
+  // strip trailing nationality codes like "NED D", "RUS D", "POL"
+  name = name.replace(/\s+[A-Z]{2,3}(\s+[A-Z])?\s*$/, '').trim();
+  return name;
+}
+
+function _normName(n) { return n.toLowerCase().replace(/\s+/g, ' ').trim(); }
+
+function _addStat(playerMap, name, type, won) {
+  const key = _normName(name);
+  if (!playerMap[key]) playerMap[key] = { name, lk: '–', einzelWins: 0, einzelLosses: 0, doppelWins: 0, doppelLosses: 0 };
+  if (won) playerMap[key][type + 'Wins']++;
+  else     playerMap[key][type + 'Losses']++;
+}
+
+function _statDiff(p, col) {
+  if (col === 'gesamt') return (p.einzelWins + p.doppelWins) - (p.einzelLosses + p.doppelLosses);
+  if (col === 'einzel') return p.einzelWins - p.einzelLosses;
+  if (col === 'doppel') return p.doppelWins - p.doppelLosses;
+  return 0;
+}
+
+function _fmtStat(w, l) {
+  if (w + l === 0) return '<span style="color:#555a7a">–</span>';
+  const d = w - l;
+  const cls = d > 0 ? 'stat-diff-pos' : d < 0 ? 'stat-diff-neg' : 'stat-diff-zero';
+  return `${w}:${l} <span class="${cls}">(${d > 0 ? '+' : ''}${d})</span>`;
+}
+
+function _fmtLK(lk) {
+  const n = parseFloat(lk);
+  return isNaN(n) ? lk : 'LK' + n.toFixed(1).replace('.', ',');
+}
+
+function renderStatistikTable(container) {
+  const col = _statistikSort.col;
+  const dir = _statistikSort.dir;
+  const data = [..._statistikData].sort((a, b) => {
+    let cmp;
+    if (col === 'name') {
+      cmp = a.name.localeCompare(b.name, 'de');
+    } else if (col === 'lk') {
+      const la = parseFloat(a.lk) || 99, lb = parseFloat(b.lk) || 99;
+      cmp = la - lb;
+    } else {
+      cmp = _statDiff(a, col) - _statDiff(b, col);
+    }
+    return cmp !== 0 ? cmp * dir : a.name.localeCompare(b.name, 'de');
+  });
+
+  const th = (id, label) => {
+    const active = col === id;
+    const arrow  = active ? (dir === -1 ? ' sort-desc' : ' sort-asc') : '';
+    return `<th class="sortable${arrow}" onclick="sortStatistik('${id}')">${label}</th>`;
+  };
+
+  let html = `<table class="stat-table"><thead><tr>
+    ${th('name','Name')}${th('lk','LK')}${th('gesamt','Gesamt')}${th('einzel','Einzel')}${th('doppel','Doppel')}
+  </tr></thead><tbody>`;
+
+  for (const p of data) {
+    const gw = p.einzelWins + p.doppelWins, gl = p.einzelLosses + p.doppelLosses;
+    html += `<tr>
+      <td>${esc(p.name)}</td>
+      <td>${esc(_fmtLK(p.lk))}</td>
+      <td>${_fmtStat(gw, gl)}</td>
+      <td>${_fmtStat(p.einzelWins, p.einzelLosses)}</td>
+      <td>${_fmtStat(p.doppelWins, p.doppelLosses)}</td>
+    </tr>`;
+  }
+  html += '</tbody></table>';
+  container.innerHTML = html;
+}
+
+function sortStatistik(col) {
+  const container = document.getElementById('statistik-container');
+  if (!container || !_statistikData) return;
+  if (_statistikSort.col === col) {
+    _statistikSort.dir *= -1;
+  } else {
+    _statistikSort.dir = (col === 'name' || col === 'lk') ? 1 : -1;
+  }
+  _statistikSort.col = col;
+  renderStatistikTable(container);
+}
+
+/* ── Mannschaftsstatistik ───────────────────────────────────── */
+let _mannschaftData = null;
+let _mannschaftSort = { col: 'gesamt', dir: -1 };
+
+function loadMannschaft() {
+  const container = document.getElementById('mannschaft-container');
+  if (!container || container.dataset.loaded === '1') return;
+
+  if (!allMatches.length) {
+    container.innerHTML = '<div class="status-msg">Daten noch nicht geladen – bitte erneut öffnen.</div>';
+    return;
+  }
+  container.dataset.loaded = '1';
+
+  const teamMap = {};
+  for (const m of allMatches) {
+    if (!/^\d+:\d+$/.test(m.result || '')) continue;
+    const key = m.team;
+    if (!teamMap[key]) teamMap[key] = { key, label: m.label || m.team, gF: 0, gA: 0, hF: 0, hA: 0, aF: 0, aA: 0 };
+    const [r1, r2] = m.result.split(':').map(Number);
+    const cf = m.isHome ? r1 : r2;
+    const ca = m.isHome ? r2 : r1;
+    const pts = cf > ca ? [2, 0] : cf < ca ? [0, 2] : [1, 1];
+    teamMap[key].gF += pts[0]; teamMap[key].gA += pts[1];
+    if (m.isHome) { teamMap[key].hF += pts[0]; teamMap[key].hA += pts[1]; }
+    else          { teamMap[key].aF += pts[0]; teamMap[key].aA += pts[1]; }
+  }
+
+  _mannschaftData = Object.values(teamMap);
+
+  if (!_mannschaftData.length) {
+    container.innerHTML = '<div class="status-msg">Keine abgeschlossenen Spiele.</div>';
+    return;
+  }
+  renderMannschaftTable(container);
+}
+
+function _mannschaftDiff(t, col) {
+  if (col === 'gesamt')    return t.gF - t.gA;
+  if (col === 'heim')      return t.hF - t.hA;
+  if (col === 'auswaerts') return t.aF - t.aA;
+  return 0;
+}
+
+function _mannschaftRank(t) {
+  const league = (typeof LEAGUES !== 'undefined') ? LEAGUES.find(l => l.team === t.key) : null;
+  return (league && league.rank) ? Number(league.rank) : 999;
+}
+
+function renderMannschaftTable(container) {
+  const col = _mannschaftSort.col;
+  const dir = _mannschaftSort.dir;
+  const data = [..._mannschaftData].sort((x, y) => {
+    let cmp;
+    if (col === 'name') {
+      cmp = x.label.localeCompare(y.label, 'de');
+    } else if (col === 'rang') {
+      cmp = _mannschaftRank(x) - _mannschaftRank(y);
+    } else {
+      cmp = _mannschaftDiff(x, col) - _mannschaftDiff(y, col);
+    }
+    return cmp !== 0 ? cmp * dir : x.label.localeCompare(y.label, 'de');
+  });
+
+  const th = (id, label) => {
+    const active = col === id;
+    const arrow  = active ? (dir === -1 ? ' sort-desc' : ' sort-asc') : '';
+    return `<th class="sortable${arrow}" onclick="sortMannschaft('${id}')">${label}</th>`;
+  };
+
+  let html = `<table class="stat-table"><thead><tr>
+    ${th('name','Mannschaft')}${th('gesamt','Gesamt')}${th('heim','Heim')}${th('auswaerts','Auswärts')}${th('rang','Rang')}
+  </tr></thead><tbody>`;
+  for (const t of data) {
+    const rank = _mannschaftRank(t);
+    const rankDisplay = rank === 999 ? '–' : String(rank);
+    html += `<tr>
+      <td>${esc(t.label)}</td>
+      <td>${_fmtStat(t.gF, t.gA)}</td>
+      <td>${_fmtStat(t.hF, t.hA)}</td>
+      <td>${_fmtStat(t.aF, t.aA)}</td>
+      <td><button class="stat-rank-btn" onclick="backToList();showTable('${t.key}')">${esc(rankDisplay)}</button></td>
+    </tr>`;
+  }
+  html += '</tbody></table>';
+  container.innerHTML = html;
+}
+
+function sortMannschaft(col) {
+  const container = document.getElementById('mannschaft-container');
+  if (!container || !_mannschaftData) return;
+  if (_mannschaftSort.col === col) {
+    _mannschaftSort.dir *= -1;
+  } else {
+    _mannschaftSort.dir = (col === 'name' || col === 'rang') ? 1 : -1;
+  }
+  _mannschaftSort.col = col;
+  renderMannschaftTable(container);
+}
 </script>
 </body>
 </html>
