@@ -2671,6 +2671,7 @@ async function showTable(team) {
 }
 
 function backToList() {
+  if (_navStack.length) { _navStack.pop()(); return; }
   clearTimeout(_settingsCloseTimer);
   document.getElementById('detail-view').style.display = 'none';
   document.getElementById('report-view').style.display = 'none';
@@ -2720,9 +2721,17 @@ async function showInfo(openAccordion) {
 
 let _reportTeam = '';
 let _groupMatchMap = {};
+const _navStack = [];
 
 async function showReport(team, reportUrl, matchObj) {
   _reportTeam = team;
+  const fromDetail = document.getElementById('detail-view').style.display === 'block';
+  if (fromDetail) {
+    _navStack.push(() => {
+      document.getElementById('report-view').style.display = 'none';
+      document.getElementById('detail-view').style.display = 'block';
+    });
+  }
   document.getElementById('matches-container').style.display = 'none';
   document.getElementById('update-info').style.display = 'none';
   document.getElementById('detail-view').style.display = 'none';
@@ -2754,6 +2763,10 @@ function fitReportTeams() {
 }
 
 function showTableFromReport() {
+  _navStack.push(() => {
+    document.getElementById('detail-view').style.display = 'none';
+    document.getElementById('report-view').style.display = 'flex';
+  });
   document.getElementById('report-view').style.display = 'none';
   showTable(_reportTeam);
 }
