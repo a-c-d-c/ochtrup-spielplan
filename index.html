@@ -651,9 +651,10 @@
     color: #8aadd4;
     margin: 4px 0 2px;
   }
-  .report-result.win  { color: #28a856; }
-  .report-result.loss { color: #e03838; }
-  .report-result.draw { color: #d4a000; }
+  .report-result.win     { color: #28a856; }
+  .report-result.loss    { color: #e03838; }
+  .report-result.draw    { color: #d4a000; }
+  .report-result.neutral { color: #9095b0; }
   .report-date { font-size: 0.78rem; color: #9095b0; }
   .report-section {
     font-family: 'Bebas Neue', sans-serif;
@@ -2727,7 +2728,7 @@ function renderReport(html, m) {
   /* ── Header ── */
   out += `<div class="report-match-header">
     <div class="report-teams">${esc(m.homeTeam)} <span style="color:#555a7a">vs.</span> ${esc(m.awayTeam)}</div>
-    <div class="report-result ${resultCls(m.result, m.isHome)}">${m.result}</div>
+    <div class="report-result ${m.isClubMatch ? resultCls(m.result, m.isHome) : 'neutral'}">${m.result}</div>
     <div class="report-date">${WEEKDAYS[m.date.getDay()]} ${m.dateStr} · ${m.timeStr} Uhr · ${m.label}</div>
   </div>`;
 
