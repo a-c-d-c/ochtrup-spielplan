@@ -3142,11 +3142,11 @@ function parseLKList(html) {
     const cellTxt = cells[3].textContent.replace(/\s+/g, ' ').trim();
     const lkM = lkRaw.match(/^LK(\d{1,2}(?:[.,]\d)?)$/);
     if (!lkM || !cellTxt.includes(',')) return;
-    const lk          = lkM[1].replace(',', '.');
-    const name        = cellTxt.replace(/\s*\(\d{4}\)\s*$/, '').trim();
-    const yearM       = cellTxt.match(/\((\d{4})\)/);
-    const displayName = yearM ? `${name} (${yearM[1]})` : name;
-    if (name) map[_normName(name)] = { name: displayName, lk, einzelWins: 0, einzelLosses: 0, doppelWins: 0, doppelLosses: 0 };
+    const lk    = lkM[1].replace(',', '.');
+    const name  = cellTxt.replace(/\s*\(\d{4}\)\s*$/, '').trim();
+    const yearM = cellTxt.match(/\((\d{4})\)/);
+    const year  = yearM ? yearM[1] : '';
+    if (name) map[_normName(name)] = { name, year, lk, einzelWins: 0, einzelLosses: 0, doppelWins: 0, doppelLosses: 0 };
   });
   return map;
 }
@@ -3262,6 +3262,9 @@ function renderStatistikTable(container) {
     } else if (col === 'lk') {
       const la = parseFloat(a.lk) || 99, lb = parseFloat(b.lk) || 99;
       cmp = la - lb;
+    } else if (col === 'jahrg') {
+      const ya = a.year || '9999', yb = b.year || '9999';
+      cmp = ya.localeCompare(yb);
     } else {
       cmp = _statDiff(a, col) - _statDiff(b, col);
     }
@@ -3275,13 +3278,14 @@ function renderStatistikTable(container) {
   };
 
   let html = `<table class="stat-table"><thead><tr>
-    ${th('name','Name')}${th('lk','LK')}${th('gesamt','Gesamt')}${th('einzel','Einzel')}${th('doppel','Doppel')}
+    ${th('name','Name')}${th('jahrg','Jahrg.')}${th('lk','LK')}${th('gesamt','Gesamt')}${th('einzel','Einzel')}${th('doppel','Doppel')}
   </tr></thead><tbody>`;
 
   for (const p of data) {
     const gw = p.einzelWins + p.doppelWins, gl = p.einzelLosses + p.doppelLosses;
     html += `<tr>
       <td>${esc(p.name)}</td>
+      <td>${esc(p.year || '–')}</td>
       <td>${esc(_fmtLK(p.lk))}</td>
       <td>${_fmtStat(gw, gl)}</td>
       <td>${_fmtStat(p.einzelWins, p.einzelLosses)}</td>
@@ -3298,7 +3302,7 @@ function sortStatistik(col) {
   if (_statistikSort.col === col) {
     _statistikSort.dir *= -1;
   } else {
-    _statistikSort.dir = (col === 'name' || col === 'lk') ? 1 : -1;
+    _statistikSort.dir = (col === 'name' || col === 'lk' || col === 'jahrg') ? 1 : -1;
   }
   _statistikSort.col = col;
   renderStatistikTable(container);
