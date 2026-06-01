@@ -2771,6 +2771,18 @@ function showTableFromReport() {
   showTable(_reportTeam);
 }
 
+function showTableFromInfo(team) {
+  _navStack.push(() => {
+    document.getElementById('detail-view').style.display = 'none';
+    document.getElementById('matches-container').style.display = 'none';
+    document.getElementById('update-info').style.display = 'none';
+    document.getElementById('controls-slider').style.display = 'none';
+    document.getElementById('info-view').style.display = 'block';
+  });
+  document.getElementById('info-view').style.display = 'none';
+  showTable(team);
+}
+
 function renderReport(html, m) {
   const doc = new DOMParser().parseFromString(html, 'text/html');
   const clubCtx = m.isClubMatch !== false;
@@ -3372,7 +3384,7 @@ function renderMannschaftTable(container) {
       <td>${_fmtStat(t.gF, t.gA)}</td>
       <td>${_fmtStat(t.hF, t.hA)}</td>
       <td>${_fmtStat(t.aF, t.aA)}</td>
-      <td><button class="stat-rank-btn" onclick="backToList();showTable('${t.key}')">${esc(rankDisplay)}</button></td>
+      <td><button class="stat-rank-btn" onclick="showTableFromInfo('${t.key}')">${esc(rankDisplay)}</button></td>
     </tr>`;
   }
   html += '</tbody></table>';
