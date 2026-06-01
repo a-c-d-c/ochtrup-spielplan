@@ -1409,12 +1409,18 @@ function toggleAccordion(id) {
   const body = document.getElementById(id);
   if (!body) return;
   const isOpen = body.classList.contains('open');
-  document.querySelectorAll('#info-content .accordion-body').forEach(b => b.classList.remove('open'));
+  document.querySelectorAll('#info-content .accordion-body').forEach(b => {
+    b.classList.remove('open');
+    b.style.maxHeight = '';
+  });
   document.querySelectorAll('#info-content .accordion-btn').forEach(b => b.classList.remove('open'));
   if (!isOpen) {
     body.classList.add('open');
     const btn = document.querySelector('#info-content .accordion-btn[data-target="' + id + '"]');
     if (btn) btn.classList.add('open');
+    body.addEventListener('transitionend', () => {
+      if (body.classList.contains('open')) body.style.maxHeight = 'none';
+    }, { once: true });
   }
 }
 
