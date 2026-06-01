@@ -846,7 +846,7 @@
     -webkit-overflow-scrolling: touch;
     z-index: 10;
     background: #0f1117;
-    padding: calc(env(safe-area-inset-top) + 20px) max(16px, calc((100% - 608px) / 2)) 40px;
+    padding: calc(env(safe-area-inset-top) + 20px) max(16px, calc((100% - 608px) / 2)) calc(40px + env(safe-area-inset-bottom));
   }
   /* Report-View: Flex-Struktur für zuverlässiges iOS-Scroll */
   #report-view { overflow: hidden; flex-direction: column; padding: calc(env(safe-area-inset-top) + 20px) max(16px, calc((100% - 608px) / 2)) 0; }
@@ -856,7 +856,7 @@
     overflow-y: auto;
     overflow-x: hidden;
     -webkit-overflow-scrolling: touch;
-    padding-bottom: 40px;
+    padding-bottom: calc(40px + env(safe-area-inset-bottom));
   }
 
 
@@ -2589,6 +2589,7 @@ async function showTable(team) {
 
   // Alle Spiele der Gruppe (kompletter Gruppenspielplan)
   const allGroupMatches = parseLeagueAll(html, league);
+  _groupMatchMap = {};
   let schedHtml = '<div class="detail-schedule-title">Spielplan der Gruppe</div>';
   for (const m of allGroupMatches) {
     const past = isPast(m.date) || /^\d+:\d+$/.test(m.result || '');
@@ -2608,7 +2609,14 @@ async function showTable(team) {
           resultEl = `<span class="detail-schedule-result ${cls}">${esc(txt)}</span>`;
         }
       } else {
-        resultEl = `<span class="detail-schedule-result neutral">${esc(txt)}</span>`;
+        if (m.reportUrl) {
+          const safeUrl  = m.reportUrl.replace(/'/g, "\\'");
+          const safeTeam = team.replace(/'/g, "\\'");
+          _groupMatchMap[m.reportUrl] = m;
+          resultEl = `<button class="detail-schedule-result neutral" onclick="showReport('${safeTeam}','${safeUrl}',_groupMatchMap['${safeUrl}'])">${esc(txt)}</button>`;
+        } else {
+          resultEl = `<span class="detail-schedule-result neutral">${esc(txt)}</span>`;
+        }
       }
     }
     schedHtml += `<div class="detail-schedule-row">` +
@@ -2673,6 +2681,7 @@ async function showInfo(openAccordion) {
 }
 
 let _reportTeam = '';
+let _groupMatchMap = {};
 
 async function showReport(team, reportUrl, matchObj) {
   _reportTeam = team;
