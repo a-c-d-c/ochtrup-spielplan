@@ -3249,7 +3249,7 @@ function _fmtStat(w, l) {
 
 function _fmtLK(lk) {
   const n = parseFloat(lk);
-  return isNaN(n) ? lk : 'LK' + n.toFixed(1).replace('.', ',');
+  return isNaN(n) ? lk : n.toFixed(1).replace('.', ',');
 }
 
 function renderStatistikTable(container) {
