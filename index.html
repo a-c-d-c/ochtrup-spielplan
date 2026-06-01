@@ -3120,8 +3120,7 @@ async function loadStatistik() {
       if (reportResults[i]) parseReportStats(reportResults[i], reportMatches[i], playerMap);
     }
 
-    _statistikData = Object.values(playerMap)
-      .filter(p => p.lk !== '–' && p.einzelWins + p.einzelLosses + p.doppelWins + p.doppelLosses > 0);
+    _statistikData = Object.values(playerMap).filter(p => p.lk !== '–');
 
     renderStatistikTable(container);
   } catch(e) {
