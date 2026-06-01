@@ -3284,7 +3284,7 @@ function renderStatistikTable(container) {
   for (const p of data) {
     const gw = p.einzelWins + p.doppelWins, gl = p.einzelLosses + p.doppelLosses;
     html += `<tr>
-      <td>${esc(p.name)}</td>
+      <td>${(ci => esc(ci >= 0 ? p.name.slice(0, ci) : p.name) + '<br><span style="font-size:0.72rem;opacity:0.75">' + esc(ci >= 0 ? p.name.slice(ci + 1).trim() : '') + '</span>')(p.name.indexOf(','))}</td>
       <td>${esc(p.year || '–')}</td>
       <td>${esc(_fmtLK(p.lk))}</td>
       <td>${_fmtStat(gw, gl)}</td>
