@@ -1476,16 +1476,15 @@ function setTheme(theme) {
 
 // Kategorie-Paletten — hell → dunkel (jung → alt)
 const PALETTE_JUGEND = [
-  [155, 210, 255], // sehr helles Blau (U8)
-  [128, 193, 252],
-  [102, 175, 248],
-  [ 78, 156, 240],
-  [ 58, 136, 228],
-  [ 40, 115, 212],
-  [ 26,  95, 192],
-  [ 15,  76, 170],
-  [  8,  58, 146],
-  [  3,  42, 122], // tiefstes Blau (U18+)
+  [130, 230, 148], // sehr helles Grün (U8)
+  [ 92, 208, 118],
+  [ 65, 188,  95],
+  [ 42, 168,  75],
+  [ 25, 148,  58],
+  [ 16, 130,  46],
+  [ 10, 112,  36],
+  [  6,  94,  28],
+  [  3,  78,  22], // tiefstes Grün (U18+)
 ];
 const PALETTE_DAMEN = [
   [255, 178, 205],
@@ -1496,15 +1495,16 @@ const PALETTE_DAMEN = [
   [158,  22,  70],
 ];
 const PALETTE_HERREN = [
-  [130, 230, 148],
-  [ 92, 208, 118],
-  [ 65, 188,  95],
-  [ 42, 168,  75],
-  [ 25, 148,  58],
-  [ 16, 130,  46],
-  [ 10, 112,  36],
-  [  6,  94,  28],
-  [  3,  78,  22],
+  [155, 210, 255], // sehr helles Blau
+  [128, 193, 252],
+  [102, 175, 248],
+  [ 78, 156, 240],
+  [ 58, 136, 228],
+  [ 40, 115, 212],
+  [ 26,  95, 192],
+  [ 15,  76, 170],
+  [  8,  58, 146],
+  [  3,  42, 122], // tiefstes Blau
 ];
 const PALETTE_GEMISCHT = [
   [255, 225,  80],
@@ -1557,9 +1557,9 @@ function buildTeamCSS(leagues, theme) {
   function toHex(rgb) { return '#' + rgb.map(x=>x.toString(16).padStart(2,'0')).join(''); }
   return leagues.map(l => {
     let [r,g,b] = l.color;
-    if (isJugend(l.label))            [r,g,b] = [  3, 42,122];
+    if (isJugend(l.label))            [r,g,b] = [  3, 78, 22];
     else if (/damen/i.test(l.label))  [r,g,b] = [220, 80,130];
-    else if (/herren/i.test(l.label)) [r,g,b] = [  3, 78, 22];
+    else if (/herren/i.test(l.label)) [r,g,b] = [  3, 42,122];
     const br = Math.round(r*0.5+130), bg = Math.round(g*0.5+130), bb = Math.round(b*0.5+130);
     const bright  = '#' + [br,bg,bb].map(x=>Math.min(255,x).toString(16).padStart(2,'0')).join('');
     const cardBg  = toHex(blend(base, [r,g,b], 0.38));
