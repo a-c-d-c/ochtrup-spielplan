@@ -1081,6 +1081,8 @@ const LS_THEME       = 'spielplan-theme';
 const LS_OVERLAY_DARK  = 'spielplan-overlay-dark';
 const LS_OVERLAY_LIGHT = 'spielplan-overlay-light';
 const LS_STARTS      = 'spielplan-starts';
+const LS_HTML_CACHE  = 'spielplan-html-v1';
+const HTML_CACHE_TTL = 30 * 60 * 1000;
 
 const LIGHT_THEME_CSS = `
   html, body { background: #f0f2f8; }
@@ -1780,6 +1782,21 @@ let showTeams   = _state.showTeams;
 let selectMode  = _state.selectMode;
 const leagueHtml = {};
 
+function getCachedHtml(key) {
+  try {
+    const raw = localStorage.getItem(LS_HTML_CACHE + key);
+    if (!raw) return null;
+    const { ts, html } = JSON.parse(raw);
+    return Date.now() - ts < HTML_CACHE_TTL ? html : null;
+  } catch { return null; }
+}
+function setCachedHtml(key, html) {
+  try { localStorage.setItem(LS_HTML_CACHE + key, JSON.stringify({ ts: Date.now(), html })); } catch {}
+}
+function clearHtmlCache() {
+  Object.keys(localStorage).filter(k => k.startsWith(LS_HTML_CACHE)).forEach(k => localStorage.removeItem(k));
+}
+
 /* ── Fetch ─────────────────────────────────────────────────── */
 async function fetchURL(targetUrl) {
   const encoded = encodeURIComponent(targetUrl);
@@ -1803,21 +1820,22 @@ async function fetchURL(targetUrl) {
       .catch(e => { clearTimeout(timer); throw e; });
   }
 
-  /* Runde 1: allorigins + codetabs gleichzeitig (zwei verschiedene Dienste) */
-  const c1 = new AbortController(), c2 = new AbortController();
+  /* Runde 1: drei Proxies gleichzeitig – erster Treffer gewinnt */
+  const c1 = new AbortController(), c2 = new AbortController(), c3 = new AbortController();
   try {
     const result = await Promise.any([
-      tryProxy('https://api.allorigins.win/get?url=' + encoded,      true,  c1, 10000),
-      tryProxy('https://api.codetabs.com/v1/proxy?quest=' + encoded, false, c2, 10000),
+      tryProxy('https://api.allorigins.win/get?url=' + encoded,      true,  c1, 8000),
+      tryProxy('https://api.codetabs.com/v1/proxy?quest=' + encoded, false, c2, 8000),
+      tryProxy('https://corsproxy.io/?' + encoded,                   false, c3, 8000),
     ]);
-    c1.abort(); c2.abort();
+    c1.abort(); c2.abort(); c3.abort();
     return result;
   } catch {}
 
   /* Runde 2: letzter Fallback mit allorigins/raw */
-  const c3 = new AbortController();
+  const c4 = new AbortController();
   try {
-    return await tryProxy('https://api.allorigins.win/raw?url=' + encoded, false, c3, 12000);
+    return await tryProxy('https://api.allorigins.win/raw?url=' + encoded, false, c4, 10000);
   } catch(e) {
     throw new Error('Alle Proxies fehlgeschlagen (' + (e.message || '') + ')');
   }
@@ -2010,54 +2028,92 @@ function extractClubRank(html) {
   return null;
 }
 
-async function loadAllData() {
-  const errBanner = document.getElementById('error-banner');
+async function loadAllData(forceRefresh = false) {
+  const errBanner  = document.getElementById('error-banner');
   const loadBanner = document.getElementById('loading-banner');
   const refreshBtn = document.getElementById('btn-refresh');
+  const ui         = document.getElementById('update-info');
 
   errBanner.style.display  = 'none';
   loadBanner.style.display = 'none';
-  const mc    = document.getElementById('matches-container');
-  const nmBox = document.getElementById('next-match-box');
-  mc.innerHTML = '';
-  mc.style.opacity = '0';
-  mc.style.pointerEvents = 'none';
-  document.getElementById('controls-slider').style.pointerEvents = 'none';
-  document.getElementById('update-info').style.display = 'none';
-
-  /* Ladeindikator im Nächstes-Spiel-Container anzeigen */
-  LEAGUES.forEach(l => nmBox.classList.remove(l.team));
-  nmBox.classList.remove('home-game');
-  nmBox.classList.add('no-match');
-  nmBox.style.transition = '';
-  nmBox.style.display = 'flex';
-  nmBox.style.opacity = '1';
-  document.getElementById('nm-league').textContent = '';
-  document.getElementById('nm-league').className   = 'nm-league';
-  document.getElementById('nm-date').innerHTML     = '';
-  document.getElementById('nm-days').textContent   = '';
-  document.getElementById('nm-unit').textContent   = '';
-  const nmTeams = document.getElementById('nm-teams');
-  nmTeams.style.flexDirection  = 'column';
-  nmTeams.style.justifyContent = 'center';
-  nmTeams.style.marginTop      = '-3rem';
-  nmTeams.innerHTML = '<div class="loading-row" style="justify-content:center"><div class="spinner"></div>Spieldaten werden geladen …</div>';
+  ui.style.display = 'none';
   refreshBtn.disabled = true;
   refreshBtn.classList.add('spinning');
 
-  /* Alle Ligen parallel laden – jede wird sofort angezeigt sobald sie fertig ist */
+  const mc    = document.getElementById('matches-container');
+  const nmBox = document.getElementById('next-match-box');
+  LEAGUES.forEach(l => nmBox.classList.remove(l.team));
+  nmBox.classList.remove('home-game');
+
   allMatches = [];
   const errors = [];
 
+  /* Phase 1: gecachte HTML sofort rendern */
+  if (!forceRefresh) {
+    for (const league of LEAGUES) {
+      const cached = getCachedHtml(league.team);
+      if (cached) {
+        leagueHtml[league.team] = cached;
+        league.rank = extractClubRank(cached);
+        const rankEl = document.getElementById('rank-' + league.team);
+        if (rankEl && league.rank) rankEl.textContent = 'Rang ' + league.rank;
+        allMatches = [...allMatches, ...parseLeague(cached, league)].sort((a, b) => a.date - b.date);
+      }
+    }
+  }
+
+  if (allMatches.length) {
+    /* Cache vorhanden → sofort sichtbar, Update-Hinweis zeigen */
+    mc.style.opacity = '1';
+    mc.style.pointerEvents = '';
+    document.getElementById('controls-slider').style.pointerEvents = '';
+    nmBox.style.transition = '';
+    nmBox.style.display = 'flex';
+    nmBox.style.opacity = '1';
+    renderNextMatch();
+    renderMatches();
+    ui.textContent = 'Wird aktualisiert …';
+    ui.style.display = 'block';
+  } else {
+    /* Kein Cache → Lade-Spinner anzeigen */
+    mc.innerHTML = '';
+    mc.style.opacity = '0';
+    mc.style.pointerEvents = 'none';
+    document.getElementById('controls-slider').style.pointerEvents = 'none';
+    nmBox.classList.add('no-match');
+    nmBox.style.transition = '';
+    nmBox.style.display = 'flex';
+    nmBox.style.opacity = '1';
+    document.getElementById('nm-league').textContent = '';
+    document.getElementById('nm-league').className   = 'nm-league';
+    document.getElementById('nm-date').innerHTML     = '';
+    document.getElementById('nm-days').textContent   = '';
+    document.getElementById('nm-unit').textContent   = '';
+    const nmTeams = document.getElementById('nm-teams');
+    nmTeams.style.flexDirection  = 'column';
+    nmTeams.style.justifyContent = 'center';
+    nmTeams.style.marginTop      = '-3rem';
+    nmTeams.innerHTML = '<div class="loading-row" style="justify-content:center"><div class="spinner"></div>Spieldaten werden geladen …</div>';
+  }
+
+  const hadCache = allMatches.length > 0;
+
+  /* Phase 2: frische Daten laden, progressiv rendern */
   async function loadLeague(league, attempt) {
     try {
       const html = await fetchURL(league.url);
+      setCachedHtml(league.team, html);
       leagueHtml[league.team] = html;
       league.rank = extractClubRank(html);
       const rankEl = document.getElementById('rank-' + league.team);
-      if (rankEl && league.rank) rankEl.textContent = 'Rang ' + league.rank;
-      allMatches = [...allMatches, ...parseLeague(html, league)]
-        .sort((a, b) => a.date - b.date);
+      if (rankEl && league.rank) rankEl.textContent = 'Rang ' + league.rank;
+      allMatches = allMatches.filter(m => m.team !== league.team);
+      allMatches = [...allMatches, ...parseLeague(html, league)].sort((a, b) => a.date - b.date);
+      mc.style.opacity = '1';
+      mc.style.pointerEvents = '';
+      document.getElementById('controls-slider').style.pointerEvents = '';
+      renderNextMatch();
+      renderMatches();
     } catch(e) {
       if (attempt < 3) {
         await new Promise(r => setTimeout(r, 1200 * attempt));
@@ -2065,11 +2121,11 @@ async function loadAllData() {
       }
       errors.push(league.label + ': ' + e.message);
       const rankEl = document.getElementById('rank-' + league.team);
-      if (rankEl) rankEl.textContent = '⚠';
+      if (rankEl && !leagueHtml[league.team]) rankEl.textContent = '⚠';
     }
   }
 
-  /* 3 Worker, 300ms Pause — Balance zwischen Geschwindigkeit und Proxy-Rate-Limit */
+  /* 3 Worker, 300ms Pause */
   const queue = [...LEAGUES];
   const workers = Array(3).fill(null).map(async () => {
     while (queue.length) {
@@ -2085,24 +2141,21 @@ async function loadAllData() {
   refreshBtn.disabled = false;
   refreshBtn.classList.remove('spinning');
 
-  if (errors.length) {
-    errBanner.innerHTML =
-      '<strong>⚠ Fehler beim Laden:</strong><br>' + errors.join('<br>');
-    errBanner.style.display = 'block';
-  }
-
   if (!allMatches.length) {
     errBanner.innerHTML =
       '<strong>⚠ Keine Spieldaten gefunden</strong><br>' +
       'Mögliche Ursache: liga.nu blockiert den CORS-Proxy.<br>' +
       errors.join('<br>');
     errBanner.style.display = 'block';
-    document.getElementById('matches-container').innerHTML = '';
     renderNextMatch();
     return;
   }
 
-  const ui = document.getElementById('update-info');
+  if (errors.length) {
+    errBanner.innerHTML = '<strong>⚠ Fehler beim Laden:</strong><br>' + errors.join('<br>');
+    errBanner.style.display = 'block';
+  }
+
   const now = new Date();
   const loaded = LEAGUES.filter(l => leagueHtml[l.team]).length;
   const missing = LEAGUES.filter(l => !leagueHtml[l.team]).map(l => l.label).join(', ');
@@ -2113,24 +2166,29 @@ async function loadAllData() {
     (missing ? ' · Fehlend: ' + missing : '');
   ui.style.display = 'block';
 
-  mc.style.pointerEvents = '';
-  document.getElementById('controls-slider').style.pointerEvents = '';
-  nmBox.style.transition = 'opacity 2s ease';
-  nmBox.style.opacity = '0';
-  renderNextMatch();
-  renderMatches();
   scheduleAutoRefresh();
-  requestAnimationFrame(() => {
+
+  if (!hadCache) {
+    /* Erster Load ohne Cache: sanftes Einblenden */
+    nmBox.style.transition = 'opacity 2s ease';
+    nmBox.style.opacity = '0';
+    renderNextMatch();
+    renderMatches();
     requestAnimationFrame(() => {
-      mc.style.opacity = '1'; nmBox.style.opacity = '1';
-      if (_pwaHintPending) {
-        _pwaHintPending = false;
-        mc.addEventListener('transitionend', () => {
-          document.getElementById('controls-inner').style.transform = 'translateX(0)';
-        }, { once: true });
-      }
+      requestAnimationFrame(() => {
+        mc.style.opacity = '1'; nmBox.style.opacity = '1';
+        if (_pwaHintPending) {
+          _pwaHintPending = false;
+          mc.addEventListener('transitionend', () => {
+            document.getElementById('controls-inner').style.transform = 'translateX(0)';
+          }, { once: true });
+        }
+      });
     });
-  });
+  } else if (_pwaHintPending) {
+    _pwaHintPending = false;
+    document.getElementById('controls-inner').style.transform = 'translateX(0)';
+  }
 }
 
 /* ── Nächstes Spiel ────────────────────────────────────────── */
@@ -2520,7 +2578,7 @@ function closeFavoriten(immediate) {
   renderMatches();
 }
 
-async function refreshData() { localStorage.removeItem(LS_LEAGUES); await initLeagues(); await loadAllData(); }
+async function refreshData() { clearHtmlCache(); localStorage.removeItem(LS_LEAGUES); await initLeagues(); await loadAllData(true); }
 
 /* ── Auto-Refresh laufende Spiele (alle 15 min, nur bei laufenden Spielen) */
 let _autoRefreshTimer = null;
