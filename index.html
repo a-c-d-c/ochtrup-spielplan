@@ -3327,6 +3327,10 @@ function renderStatistikTable(container) {
   const col = _statistikSort.col;
   const dir = _statistikSort.dir;
   const data = [..._statistikData].sort((a, b) => {
+    const aPlayed = a.einzelWins + a.einzelLosses + a.doppelWins + a.doppelLosses;
+    const bPlayed = b.einzelWins + b.einzelLosses + b.doppelWins + b.doppelLosses;
+    if (aPlayed === 0 && bPlayed > 0) return 1;
+    if (bPlayed === 0 && aPlayed > 0) return -1;
     let cmp;
     if (col === 'name') {
       cmp = a.name.localeCompare(b.name, 'de');
