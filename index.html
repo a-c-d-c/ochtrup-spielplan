@@ -68,7 +68,7 @@
     left: max(32px, calc((100% - 576px) / 2));
     right: max(32px, calc((100% - 576px) / 2));
     background: #0f1117;
-    border: 1px solid rgba(255,255,255,0.1);
+    border: 1px solid #2e3150;
     border-radius: 14px;
     box-shadow: 0 20px 60px rgba(0,0,0,0.9), 0 6px 20px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.04);
     padding: 16px 18px 16px;
@@ -284,7 +284,6 @@
     transition: none;
   }
   #favoriten-card.open { opacity: 1; }
-  /* Header-Zeile im Panel: Close-Button zentriert, gleiche Größe wie Trigger */
   .favoriten-header-row { display: flex; gap: 6px; margin-bottom: 12px; position: sticky; top: 0; background: rgba(15,17,30,0.98); z-index: 1; padding-top: 12px; }
   .favoriten-header-spacer { flex: 1; }
   .btn-favoriten-close { flex: 1; margin: 0 6px; padding-top: 14px; padding-bottom: 14px; color: #c8cade; border-color: rgba(144,149,176,0.5); background: rgba(144,149,176,0.1); }
@@ -361,6 +360,7 @@
   }
   #report-tabelle-btn { background: rgba(100,140,220,0.15); border-color: #4a6aaa; color: #8aadd4; }
   /* ── Spenden-Banner ── */
+  #donate-banner, #info-donate { display: none !important; }
   #donate-banner {
     margin: 0 0 16px;
     padding: 18px 16px 14px;
@@ -938,7 +938,7 @@
   <button class="btn-donate-later" onclick="closeDonate()">Vielleicht später →</button>
 </div>
 
-<div id="main-content" style="opacity:0;pointer-events:none">
+<div id="main-content">
 
 <!-- Nächstes Spiel -->
 <div id="next-match-box" class="next-match-box">
@@ -1083,7 +1083,7 @@ const LS_OVERLAY_DARK  = 'spielplan-overlay-dark';
 const LS_OVERLAY_LIGHT = 'spielplan-overlay-light';
 const LS_STARTS      = 'spielplan-starts';
 const LS_HTML_CACHE  = 'spielplan-html-v1';
-const HTML_CACHE_TTL = 30 * 60 * 1000;
+const HTML_CACHE_TTL = 4 * 60 * 60 * 1000;
 
 const LIGHT_THEME_CSS = `
   html, body { background: #f0f2f8; }
@@ -1129,13 +1129,13 @@ const LIGHT_THEME_CSS = `
   #settings-view { background: #f0f2f8; border-color: rgba(90,100,160,0.35); box-shadow: 0 20px 60px rgba(20,30,80,0.28), 0 6px 20px rgba(20,30,80,0.15), 0 0 0 1px rgba(90,100,160,0.08); }
   #settings-view .btn-filter { border-color: rgba(90,100,160,0.35); color: #3a3f60; background: transparent; }
   #settings-view .btn-filter.on { border-color: rgba(90,100,160,0.75); background: #c8cde4; color: #1a1d2e; }
-  .settings-close-btn { color: #5a5f7a; }
-  .settings-close-row { border-top-color: rgba(90,100,160,0.15); }
   .btn-info { border-color: #5a6090; color: #3a3f60; background: rgba(60,70,140,0.08); }
   .btn-settings { border-color: #5a6090; color: #3a3f60; background: rgba(60,70,140,0.08); }
   .settings-section-label { color: #5a5f7a; }
   #settings-overlay-label { color: #1a1d2e; }
   .settings-slider-lbl { color: #3a3f60; }
+  .settings-close-btn { color: #5a5f7a; }
+  .settings-close-row { border-top-color: rgba(90,100,160,0.15); }
   .info-content { color: #1a1d2e; }
   .info-content h2 { color: #0f1020; }
   #donate-banner { background: rgba(0,48,135,0.06); border-color: rgba(0,112,186,0.25); }
@@ -1192,12 +1192,12 @@ const ROLAND_GARROS_CSS = `
   .card::after, .next-match-box::after, .nm-league::after, .card-tag-row .tag::after, #team-btns-container .btn::after { background: transparent; }
   #info-view { background: #642508; }
   #settings-view { background: #642508; border-color: rgba(255,255,255,0.3); box-shadow: 0 20px 60px rgba(0,0,0,0.75), 0 6px 20px rgba(0,0,0,0.45), 0 0 0 1px rgba(255,255,255,0.07); }
-  .settings-close-btn { color: rgba(255,255,255,0.45); }
-  .settings-close-row { border-top-color: rgba(255,255,255,0.12); }
   .btn-info { border-color: rgba(255,255,255,0.5); color: #ffffff; background: rgba(255,255,255,0.1); }
   .btn-settings { border-color: rgba(255,255,255,0.5); color: #ffffff; background: rgba(255,255,255,0.1); }
   .settings-section-label { color: rgba(255,255,255,0.65); }
   #settings-overlay-label { color: #ffffff; }
+  .settings-close-btn { color: rgba(255,255,255,0.45); }
+  .settings-close-row { border-top-color: rgba(255,255,255,0.12); }
   #info-donate .btn-donate-main { background: #143D26; color: #ffffff; border: 1px solid rgba(255,255,255,0.5); }
   .info-content { color: #ffffff; }
   .info-content h2 { color: #ffffff; }
@@ -1792,6 +1792,14 @@ function getCachedHtml(key) {
     return Date.now() - ts < HTML_CACHE_TTL ? html : null;
   } catch { return null; }
 }
+function getStaleCachedHtml(key) {
+  try {
+    const raw = localStorage.getItem(LS_HTML_CACHE + key);
+    if (!raw) return null;
+    const { html } = JSON.parse(raw);
+    return html || null;
+  } catch { return null; }
+}
 function setCachedHtml(key, html) {
   try { localStorage.setItem(LS_HTML_CACHE + key, JSON.stringify({ ts: Date.now(), html })); } catch {}
 }
@@ -2121,12 +2129,26 @@ async function loadAllData(forceRefresh = false) {
         await new Promise(r => setTimeout(r, 1200 * attempt));
         return loadLeague(league, attempt + 1);
       }
-      errors.push(league.label + ': ' + e.message);
-      league.fetchError = true;
-      const rankEl = document.getElementById('rank-' + league.team);
-      if (rankEl && !leagueHtml[league.team]) {
-        rankEl.textContent = '⚠ neu laden';
-        rankEl.classList.add('rank-error');
+      const stale = !leagueHtml[league.team] && getStaleCachedHtml(league.team);
+      if (stale) {
+        leagueHtml[league.team] = stale;
+        league.rank = extractClubRank(stale);
+        const rankEl = document.getElementById('rank-' + league.team);
+        if (rankEl && league.rank) rankEl.textContent = 'Rang ' + league.rank;
+        allMatches = allMatches.filter(m => m.team !== league.team);
+        allMatches = [...allMatches, ...parseLeague(stale, league)].sort((a, b) => a.date - b.date);
+        mc.style.opacity = '1';
+        mc.style.pointerEvents = '';
+        document.getElementById('controls-slider').style.pointerEvents = '';
+        renderNextMatch(); renderMatches();
+      } else {
+        errors.push(league.label + ': ' + e.message);
+        league.fetchError = true;
+        const rankEl = document.getElementById('rank-' + league.team);
+        if (rankEl && !leagueHtml[league.team]) {
+          rankEl.textContent = '⚠ neu laden';
+          rankEl.classList.add('rank-error');
+        }
       }
     }
   }
@@ -2500,12 +2522,6 @@ function renderMatches() {
       ? '<div class="past-divider"></div>'
       : '';
 
-    const resultEl = past
-      ? (m.reportUrl
-          ? `<button class="result ${resultCls(m.result, m.isHome)}" onclick="showReport('${m.team}','${m.reportUrl}',allMatches.find(x=>x.reportUrl==='${m.reportUrl}'))">${resultTxt(m.result)}</button>`
-          : `<span class="result ${resultCls(m.result, m.isHome)}">${resultTxt(m.result)}</span>`)
-      : '';
-
     return divider + `<div class="card ${teamCls}${extra}">
   <div class="card-tag-row"><span class="tag ${tagCls}">${m.label}</span></div>
   <div class="card-top">
@@ -2513,7 +2529,7 @@ function renderMatches() {
     ${past ? '' : `<span class="card-countdown" data-matchtime="${matchDateTime(m.date, m.timeStr).getTime()}" data-matchduration="${matchDurationMs(m)}">${countdownLabel(m.date, m.timeStr, m.label)}</span>`}
     ${tabelleBtn}
   </div>
-  <div class="card-match"><div class="card-match-teams">${homeSpan}<span class="vs">vs.</span>${awaySpan}</div>${resultEl}</div>
+  <div class="card-match"><div class="card-match-teams">${homeSpan}<span class="vs">vs.</span>${awaySpan}</div>${past ? (m.reportUrl ? `<button class="result ${resultCls(m.result, m.isHome)}" onclick="showReport('${m.team}','${m.reportUrl}',allMatches.find(x=>x.reportUrl==='${m.reportUrl}'))">${resultTxt(m.result)}</button>` : `<span class="result ${resultCls(m.result, m.isHome)}">${resultTxt(m.result)}</span>`) : ''}</div>
 </div>`;
   }).join('\n');
 }
@@ -2565,7 +2581,6 @@ function openFavoriten() {
   const closeBtn = document.getElementById('btn-favoriten-close');
   const card = document.getElementById('favoriten-card');
 
-  // Load saved favorites into team buttons
   const saved = loadMeineAuswahl();
   if (saved) {
     LEAGUES.forEach(l => {
@@ -2594,7 +2609,6 @@ function closeFavoriten(immediate) {
   mc.classList.remove('favoriten-open');
   requestAnimationFrame(() => { Array.from(mc.children).forEach(el => { el.style.transition = ''; }); });
 
-  // Save current team selection as favorites
   localStorage.setItem(LS_AUSWAHL, JSON.stringify({ ...showTeams }));
 
   card.classList.remove('open');
@@ -2605,7 +2619,6 @@ function closeFavoriten(immediate) {
   }
   closeBtn.innerHTML = 'Meine<br>Favoriten<br>auswählen';
 
-  // Activate "Meine Favoriten" right button
   selectMode = 'meine';
   meineAuswahlActive = true;
   document.getElementById('btn-meine-favoriten').classList.add('on');
@@ -2665,7 +2678,7 @@ function parseStandingsTable(html) {
   const doc = new DOMParser().parseFromString(html, 'text/html');
   for (const table of doc.querySelectorAll('table')) {
     const text = table.textContent;
-    if (text.includes('Rang') && (text.includes('Mannschaft') || text.includes('Verein'))) return table;
+    if (text.includes('Rang') && text.includes('Mannschaft')) return table;
   }
   return null;
 }
@@ -2699,39 +2712,34 @@ async function showTable(team) {
 
   const html = leagueHtml[team];
   const table = parseStandingsTable(html);
-  if (!table) {
-    document.getElementById('detail-table-container').innerHTML =
-      '<div class="status-msg">Tabelle noch nicht verfügbar.</div>';
-  }
+  if (!table) { alert('Tabelle noch nicht verfügbar.'); return; }
 
-  if (table) {
-    const rows = [...table.querySelectorAll('tr')];
-    let tableHtml = '<table class="standings-table"><thead>';
+  const rows = [...table.querySelectorAll('tr')];
+  let tableHtml = '<table class="standings-table"><thead>';
 
-    for (const row of rows) {
-      const isHeader = row.querySelectorAll('th').length > 0;
-      if (isHeader) {
-        const cells = [...row.querySelectorAll('th')];
-        tableHtml += '<tr>' + cells.map(c => `<th>${esc(c.textContent.trim())}</th>`).join('') + '</tr>';
-        tableHtml += '</thead><tbody>';
-      } else {
-        const cells = [...row.querySelectorAll('td')];
-        if (cells.length < 3) continue;
-        const rowText = row.textContent;
-        const isClub = rowText.includes(CLUB_NAME);
-        tableHtml += `<tr${isClub ? ' class="club-row"' : ''}>`;
-        tableHtml += cells.map(c => `<td>${esc(c.textContent.trim())}</td>`).join('');
-        tableHtml += '</tr>';
-      }
+  for (const row of rows) {
+    const isHeader = row.querySelectorAll('th').length > 0;
+    if (isHeader) {
+      const cells = [...row.querySelectorAll('th')];
+      tableHtml += '<tr>' + cells.map(c => `<th>${esc(c.textContent.trim())}</th>`).join('') + '</tr>';
+      tableHtml += '</thead><tbody>';
+    } else {
+      const cells = [...row.querySelectorAll('td')];
+      if (cells.length < 3) continue;
+      const rowText = row.textContent;
+      const isClub = rowText.includes(CLUB_NAME);
+      tableHtml += `<tr${isClub ? ' class="club-row"' : ''}>`;
+      tableHtml += cells.map(c => `<td>${esc(c.textContent.trim())}</td>`).join('');
+      tableHtml += '</tr>';
     }
-    tableHtml += '</tbody></table>';
-
-    document.getElementById('detail-title').innerHTML =
-      `<span class="detail-title-label">${esc(league.label)}</span>` +
-      `<span class="detail-title-sub">Tabelle · Spielplan</span>` +
-      `<span class="detail-title-suffix">Tabelle · Spielplan</span>`;
-    document.getElementById('detail-table-container').innerHTML = tableHtml;
   }
+  tableHtml += '</tbody></table>';
+
+  document.getElementById('detail-title').innerHTML =
+    `<span class="detail-title-label">${esc(league.label)}</span>` +
+    `<span class="detail-title-sub">Tabelle · Spielplan</span>` +
+    `<span class="detail-title-suffix">Tabelle · Spielplan</span>`;
+  document.getElementById('detail-table-container').innerHTML = tableHtml;
 
   // Alle Spiele der Gruppe (kompletter Gruppenspielplan)
   const allGroupMatches = parseLeagueAll(html, league);
