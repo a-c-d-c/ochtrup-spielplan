@@ -3345,7 +3345,11 @@ function _extractName(txt) {
   return name;
 }
 
-function _normName(n) { return n.toLowerCase().replace(/\s+/g, ' ').trim(); }
+function _normName(n) {
+  return n.toLowerCase()
+    .replace(/\b(dr|prof|dipl|ing|mag)\.?\s*/g, '')
+    .replace(/\s+/g, ' ').trim();
+}
 
 function _addStat(playerMap, name, type, won) {
   const key = _normName(name);
@@ -3387,8 +3391,10 @@ function renderStatistikTable(container) {
       const ya = a.year || '9999', yb = b.year || '9999';
       cmp = ya.localeCompare(yb);
     } else {
-      const aPlayed = a.einzelWins + a.einzelLosses + a.doppelWins + a.doppelLosses;
-      const bPlayed = b.einzelWins + b.einzelLosses + b.doppelWins + b.doppelLosses;
+      const played = p => col === 'einzel' ? p.einzelWins + p.einzelLosses
+                        : col === 'doppel' ? p.doppelWins + p.doppelLosses
+                        : p.einzelWins + p.einzelLosses + p.doppelWins + p.doppelLosses;
+      const aPlayed = played(a), bPlayed = played(b);
       if (aPlayed === 0 && bPlayed > 0) return 1;
       if (bPlayed === 0 && aPlayed > 0) return -1;
       cmp = _statDiff(a, col) - _statDiff(b, col);
