@@ -2673,6 +2673,14 @@ function scheduleAutoRefresh() {
   }
 }
 
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && getRunningMatches().length) {
+    clearTimeout(_autoRefreshTimer);
+    _autoRefreshTimer = null;
+    autoRefreshRunning();
+  }
+});
+
 /* ── Tabellen-Ansicht ──────────────────────────────────────── */
 function parseStandingsTable(html) {
   const doc = new DOMParser().parseFromString(html, 'text/html');
