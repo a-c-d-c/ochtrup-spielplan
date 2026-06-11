@@ -2533,6 +2533,7 @@ function renderMatches() {
     ${tabelleBtn}
   </div>
   <div class="card-match"><div class="card-match-teams">${homeSpan}<span class="vs">vs.</span>${awaySpan}</div>${past ? (m.reportUrl ? `<button class="result ${resultCls(m.result, m.isHome)}" onclick="showReport('${m.team}','${m.reportUrl}',allMatches.find(x=>x.reportUrl==='${m.reportUrl}'))">${resultTxt(m.result)}</button>` : `<span class="result ${resultCls(m.result, m.isHome)}">${resultTxt(m.result)}</span>`) : ''}</div>
+  ${m.note ? `<div class="card-note">${esc(m.note)}</div>` : ''}
 </div>`;
   }).join('\n');
 }
