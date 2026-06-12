@@ -287,6 +287,10 @@
   .favoriten-header-row { display: flex; gap: 6px; margin-bottom: 12px; position: sticky; top: 0; background: rgba(15,17,30,0.98); z-index: 1; padding-top: 12px; }
   .favoriten-header-spacer { flex: 1; }
   .btn-favoriten-close { flex: 1; margin: 0 6px; padding-top: 14px; padding-bottom: 14px; color: #c8cade; border-color: rgba(144,149,176,0.5); background: rgba(144,149,176,0.1); }
+  .btn-fav-icon { background: transparent; border: 1px solid rgba(144,149,176,0.28); border-radius: 50%; color: #555a7a; font-size: 1rem; width: 38px; height: 38px; flex-shrink: 0; cursor: pointer; padding: 0; align-self: center; }
+  .btn-fav-icon:disabled { opacity: 0.4; cursor: default; }
+  .btn-fav-icon.spinning { animation: spin 0.7s linear infinite; }
+  .btn-fav-clear { font-size: 0.75rem; color: #444866; border-color: rgba(144,149,176,0.18); }
   #favoriten-card #team-btns-container .btn:not(.on) { color: #b0b5d0 !important; border-color: rgba(144,149,176,0.4) !important; }
   /* Team-Farben werden dynamisch per JS generiert → siehe #dynamic-team-css */
 
@@ -982,9 +986,9 @@
 
 <div id="favoriten-card">
   <div class="favoriten-header-row">
-    <div class="favoriten-header-spacer"></div>
+    <button class="btn-fav-icon" id="btn-refresh" title="Neu laden" onclick="refreshData()">↺</button>
     <button class="btn btn-favoriten-close" id="btn-favoriten-close">Meine<br>Favoriten<br>auswählen</button>
-    <div class="favoriten-header-spacer"></div>
+    <button class="btn-fav-icon btn-fav-clear" id="btn-favoriten-clear" title="Liste leeren" onclick="clearFavoritenListe()">✕</button>
   </div>
   <div id="team-btns-container"></div>
 </div>
@@ -1126,6 +1130,8 @@ const LIGHT_THEME_CSS = `
   #favoriten-card #team-btns-container .btn.on { color: #ffffff !important; }
   .btn-favoriten-close { border-color: rgba(90,100,160,0.75); background: #c8cde4; color: #1a1d2e; }
   .btn-refresh-favoriten { border-color: rgba(90,100,160,0.35); color: #3a3f60; }
+  .btn-fav-icon { border-color: rgba(90,100,160,0.28); color: #3a3f60; }
+  .btn-fav-clear { color: #7a80a0; border-color: rgba(90,100,160,0.18); }
   #info-view { background: #f0f2f8; }
   #btn-info-back { color: #1a1d2e !important; }
   #settings-view { background: #f0f2f8; border-color: rgba(90,100,160,0.35); box-shadow: 0 20px 60px rgba(20,30,80,0.28), 0 6px 20px rgba(20,30,80,0.15), 0 0 0 1px rgba(90,100,160,0.08); }
@@ -1191,6 +1197,8 @@ const ROLAND_GARROS_CSS = `
   #favoriten-card #team-btns-container .btn.on { color: #ffffff !important; background: #143D26 !important; border-color: #ffffff !important; font-weight: 700; }
   .btn-favoriten-close { border-color: #ffffff; background: #143D26; color: #ffffff; }
   .btn-refresh-favoriten { background: #143D26; border-color: rgba(255,255,255,0.3); color: rgba(255,255,255,0.4); }
+  .btn-fav-icon { background: #143D26; border-color: rgba(255,255,255,0.3); color: rgba(255,255,255,0.5); }
+  .btn-fav-clear { color: rgba(255,255,255,0.35); border-color: rgba(255,255,255,0.18); }
   .card::after, .next-match-box::after, .nm-league::after, .card-tag-row .tag::after, #team-btns-container .btn::after { background: transparent; }
   #info-view { background: #642508; }
   #settings-view { background: #642508; border-color: rgba(255,255,255,0.3); box-shadow: 0 20px 60px rgba(0,0,0,0.75), 0 6px 20px rgba(0,0,0,0.45), 0 0 0 1px rgba(255,255,255,0.07); }
@@ -1605,13 +1613,6 @@ function buildTeamButtons() {
     btn.addEventListener('click', e => { if (!e.target.classList.contains('team-btn-rank')) toggleTeam(l.team); });
     container.appendChild(btn);
   });
-  const refresh = document.createElement('button');
-  refresh.className   = 'btn-refresh-favoriten';
-  refresh.id          = 'btn-refresh';
-  refresh.title       = 'Neu laden';
-  refresh.textContent = '↺';
-  refresh.addEventListener('click', refreshData);
-  container.appendChild(refresh);
 }
 
 async function initLeagues() {
@@ -1706,7 +1707,8 @@ let allMatches  = [];
 function loadState() {
   const raw = localStorage.getItem(LS_STATE);
   if (raw === null) {
-    // Erster Start: AKTUELL + HEIM + AUSWÄRTS aktiv, alle Mannschaften, MEINE AUSWAHL leer
+    // Erster Start: Alle Mannschaften aktiv, Favoritenliste leer
+    localStorage.removeItem(LS_AUSWAHL);
     return { showPast: false, showFuture: true, showHome: true, showAway: true, showTeams: {}, selectMode: 'all' };
   }
   try {
@@ -2630,6 +2632,15 @@ function closeFavoriten(immediate) {
   saveState();
   renderNextMatch();
   renderMatches();
+}
+
+function clearFavoritenListe() {
+  localStorage.removeItem(LS_AUSWAHL);
+  LEAGUES.forEach(l => {
+    showTeams[l.team] = false;
+    const el = document.getElementById('btn-' + l.team);
+    if (el) el.classList.remove('on');
+  });
 }
 
 async function refreshData() { clearHtmlCache(); localStorage.removeItem(LS_LEAGUES); await initLeagues(); await loadAllData(true); }
