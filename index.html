@@ -58,6 +58,20 @@
     display: inline-flex; align-items: center; justify-content: center;
     transition: border-color 0.15s, color 0.15s;
   }
+  .btn-refresh-header {
+    position: absolute; top: env(safe-area-inset-top); left: 36px;
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    border: 1px solid #3a3f60;
+    background: rgba(144,149,176,0.08);
+    color: #9095b0;
+    font-size: 1rem;
+    cursor: pointer;
+    display: inline-flex; align-items: center; justify-content: center;
+    transition: border-color 0.15s, color 0.15s;
+  }
+  .btn-refresh-header:disabled { opacity: 0.4; cursor: default; }
+  .btn-refresh-header.spinning { animation: spin 0.7s linear infinite; }
   #info-view { display: none; }
   #settings-backdrop {
     position: fixed; top: 0; left: 0; right: 0; bottom: 0; z-index: 19; display: none;
@@ -914,6 +928,7 @@
 
 <div class="header">
   <button class="btn-settings" onclick="showSettings()" title="Einstellungen">⚙</button>
+  <button class="btn-refresh-header" id="btn-refresh" title="Neu laden" onclick="refreshData()">↺</button>
   <button class="btn-info" onclick="showInfo()" title="Info">i</button>
   <div class="header-title">
     <img src="logo.png" class="header-logo" alt="TC 1928 Ochtrup Logo" onerror="this.style.display='none'">
@@ -986,7 +1001,7 @@
 
 <div id="favoriten-card">
   <div class="favoriten-header-row">
-    <button class="btn-fav-icon" id="btn-refresh" title="Neu laden" onclick="refreshData()">↺</button>
+    <button class="btn-fav-icon btn-fav-all" id="btn-favoriten-all" title="Alle auswählen" onclick="selectAllFavoritenListe()">✓</button>
     <button class="btn btn-favoriten-close" id="btn-favoriten-close">Meine<br>Favoriten<br>auswählen</button>
     <button class="btn-fav-icon btn-fav-clear" id="btn-favoriten-clear" title="Liste leeren" onclick="clearFavoritenListe()">✕</button>
   </div>
@@ -1139,6 +1154,7 @@ const LIGHT_THEME_CSS = `
   #settings-view .btn-filter.on { border-color: rgba(90,100,160,0.75); background: #c8cde4; color: #1a1d2e; }
   .btn-info { border-color: #5a6090; color: #3a3f60; background: rgba(60,70,140,0.08); }
   .btn-settings { border-color: #5a6090; color: #3a3f60; background: rgba(60,70,140,0.08); }
+  .btn-refresh-header { border-color: #5a6090; color: #3a3f60; background: rgba(60,70,140,0.08); }
   .settings-section-label { color: #5a5f7a; }
   #settings-overlay-label { color: #1a1d2e; }
   .settings-slider-lbl { color: #3a3f60; }
@@ -1204,6 +1220,7 @@ const ROLAND_GARROS_CSS = `
   #settings-view { background: #642508; border-color: rgba(255,255,255,0.3); box-shadow: 0 20px 60px rgba(0,0,0,0.75), 0 6px 20px rgba(0,0,0,0.45), 0 0 0 1px rgba(255,255,255,0.07); }
   .btn-info { border-color: rgba(255,255,255,0.5); color: #ffffff; background: rgba(255,255,255,0.1); }
   .btn-settings { border-color: rgba(255,255,255,0.5); color: #ffffff; background: rgba(255,255,255,0.1); }
+  .btn-refresh-header { border-color: rgba(255,255,255,0.5); color: #ffffff; background: rgba(255,255,255,0.1); }
   .settings-section-label { color: rgba(255,255,255,0.65); }
   #settings-overlay-label { color: #ffffff; }
   .settings-close-btn { color: rgba(255,255,255,0.45); }
@@ -2640,6 +2657,14 @@ function clearFavoritenListe() {
     showTeams[l.team] = false;
     const el = document.getElementById('btn-' + l.team);
     if (el) el.classList.remove('on');
+  });
+}
+
+function selectAllFavoritenListe() {
+  LEAGUES.forEach(l => {
+    showTeams[l.team] = true;
+    const el = document.getElementById('btn-' + l.team);
+    if (el) el.classList.add('on');
   });
 }
 
