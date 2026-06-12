@@ -1249,8 +1249,8 @@ function unlockBodyScroll() {
 }
 
 function initOverlays() {
-  const dark  = parseInt(localStorage.getItem(LS_OVERLAY_DARK)  || '30', 10);
-  const light = parseInt(localStorage.getItem(LS_OVERLAY_LIGHT) || '30', 10);
+  const dark  = parseInt(localStorage.getItem(LS_OVERLAY_DARK)  || '10', 10);
+  const light = parseInt(localStorage.getItem(LS_OVERLAY_LIGHT) || '10', 10);
   document.documentElement.style.setProperty('--overlay-dark',  (dark  / 100).toFixed(2));
   document.documentElement.style.setProperty('--overlay-light', (light / 100).toFixed(2));
 }
@@ -1284,8 +1284,8 @@ function updateSliderForTheme() {
   if (theme === 'roland-garros') { section.style.display = 'none'; return; }
   section.style.display = '';
   const stored = theme === 'dark'
-    ? parseInt(localStorage.getItem(LS_OVERLAY_DARK)  || '30', 10)
-    : parseInt(localStorage.getItem(LS_OVERLAY_LIGHT) || '30', 10);
+    ? parseInt(localStorage.getItem(LS_OVERLAY_DARK)  || '10', 10)
+    : parseInt(localStorage.getItem(LS_OVERLAY_LIGHT) || '10', 10);
   const lbl = document.getElementById('settings-overlay-label');
   if (lbl) lbl.textContent = (stored * 2) + ' %';
   updateOverlaySliderUI(stored);
