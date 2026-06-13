@@ -1856,8 +1856,8 @@ async function fetchURL(targetUrl) {
   const c1 = new AbortController(), c2 = new AbortController();
   try {
     const result = await Promise.any([
-      tryProxy('https://api.codetabs.com/v1/proxy?quest=' + encoded, false, c1, 8000),
-      tryProxy('https://corsproxy.io/?' + encoded,                   false, c2, 8000),
+      tryProxy('https://api.codetabs.com/v1/proxy?quest=' + encoded,  false, c1, 8000),
+      tryProxy('https://thingproxy.freeboard.io/fetch/' + targetUrl,  false, c2, 8000),
     ]);
     c1.abort(); c2.abort();
     return result;
@@ -1867,8 +1867,8 @@ async function fetchURL(targetUrl) {
   const c3 = new AbortController(), c4 = new AbortController();
   try {
     return await Promise.any([
-      tryProxy('https://api.codetabs.com/v1/proxy?quest=' + encoded, false, c3, 15000),
-      tryProxy('https://corsproxy.io/?' + encoded,                   false, c4, 15000),
+      tryProxy('https://api.codetabs.com/v1/proxy?quest=' + encoded,  false, c3, 15000),
+      tryProxy('https://thingproxy.freeboard.io/fetch/' + targetUrl,  false, c4, 15000),
     ]);
   } catch(e) {
     throw new Error('Alle Proxies fehlgeschlagen (' + (e.message || '') + ')');
