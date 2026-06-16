@@ -903,6 +903,28 @@
     padding-bottom: calc(40px + env(safe-area-inset-bottom));
   }
 
+  /* ── Fenster: Spieler nach Jahrgang ── */
+  #jahrgang-modal {
+    position: fixed; inset: 0; z-index: 30; display: none;
+    background: rgba(5,7,15,0.74);
+    overflow-y: auto; -webkit-overflow-scrolling: touch;
+    padding: calc(env(safe-area-inset-top) + 24px) 16px calc(env(safe-area-inset-bottom) + 24px);
+  }
+  #jahrgang-modal.open { display: flex; align-items: flex-start; justify-content: center; }
+  .jahrgang-modal-card {
+    width: 100%; max-width: 480px; margin: auto;
+    background: #161a26; border: 1px solid rgba(144,149,176,0.22);
+    border-radius: 16px; box-shadow: 0 24px 80px rgba(0,0,0,0.6);
+    padding: 18px 18px 16px; color: #c8cade;
+  }
+  .jahrgang-modal-title { font-family: 'Bebas Neue', sans-serif; font-size: 1.5rem; letter-spacing: 0.06em; color: #fff; margin: 0 0 2px; }
+  .jahrgang-modal-sub { font-size: 0.8rem; opacity: 0.65; margin: 0 0 14px; }
+  .jahrgang-player-list { list-style: none; margin: 0; padding: 0; }
+  .jahrgang-player-list li { display: flex; justify-content: space-between; gap: 10px; padding: 8px 2px; border-bottom: 1px solid rgba(144,149,176,0.14); font-size: 0.9rem; }
+  .jahrgang-player-list li.up .jp-name { opacity: 0.65; font-style: italic; }
+  .jp-name { font-weight: 600; }
+  .jp-meta { opacity: 0.7; font-size: 0.8rem; white-space: nowrap; }
+  .jahrgang-modal-close { width: 100%; margin-top: 16px; padding: 13px; background: rgba(144,149,176,0.12); border: 1px solid rgba(144,149,176,0.5); border-radius: 22px; color: #c8cade; font-family: inherit; font-size: 0.95rem; font-weight: 600; cursor: pointer; }
 
 </style>
 <style id="theme-override-css"></style>
@@ -1087,6 +1109,15 @@
     <div class="settings-close-row">
       <button class="settings-close-btn" onclick="backFromSettings()">Schließen</button>
     </div>
+  </div>
+</div>
+
+<div id="jahrgang-modal" onclick="if(event.target===this)closeJahrgang()">
+  <div class="jahrgang-modal-card">
+    <div class="jahrgang-modal-title" id="jahrgang-modal-title"></div>
+    <div class="jahrgang-modal-sub" id="jahrgang-modal-sub"></div>
+    <div id="jahrgang-modal-body"></div>
+    <button class="jahrgang-modal-close" onclick="closeJahrgang()">Schließen</button>
   </div>
 </div>
 
@@ -2839,6 +2870,7 @@ async function showTable(team) {
 
 function backToList() {
   if (_navStack.length) { _navStack.pop()(); return; }
+  closeJahrgang();
   clearTimeout(_settingsCloseTimer);
   document.getElementById('detail-view').style.display = 'none';
   document.getElementById('report-view').style.display = 'none';
@@ -2856,9 +2888,60 @@ function backToList() {
 }
 
 function backFromInfo() {
+  if (document.getElementById('jahrgang-modal').classList.contains('open')) { closeJahrgang(); return; }
   const openBody = document.querySelector('#info-content .accordion-body.open');
   if (openBody) { toggleAccordion(openBody.id); return; }
   backToList();
+}
+
+/* ── Fenster: Spieler nach Jahrgang ────────────────────────── */
+function _parseYears(str) {
+  return (str || '').split(',').map(s => s.trim()).filter(Boolean);
+}
+
+async function showJahrgang(klasse, primaryStr, parenStr) {
+  const primary = _parseYears(primaryStr);
+  const paren   = _parseYears(parenStr);
+  const title = document.getElementById('jahrgang-modal-title');
+  const sub   = document.getElementById('jahrgang-modal-sub');
+  const body  = document.getElementById('jahrgang-modal-body');
+  title.textContent = 'Spielberechtigte Spieler ' + klasse;
+  sub.textContent = 'Jahrgänge ' + primary.join(', ') + (paren.length ? ' (' + paren.join(', ') + ' = eine Klasse höher)' : '');
+  body.innerHTML = '<div class="loading-row"><div class="spinner"></div>Spieler werden geladen …</div>';
+  document.getElementById('jahrgang-modal').classList.add('open');
+
+  if (!_statistikData) {
+    try { await loadStatistik(); } catch(e) {}
+  }
+  if (!_statistikData) {
+    body.innerHTML = '<div class="status-msg">Spielerdaten konnten nicht geladen werden.</div>';
+    return;
+  }
+
+  const parenSet = new Set(paren);
+  const wanted = new Set([...primary, ...paren]);
+  const players = _statistikData
+    .filter(p => p.year && wanted.has(p.year))
+    .sort((a, b) => (a.year !== b.year) ? a.year.localeCompare(b.year) : a.name.localeCompare(b.name, 'de'));
+
+  if (!players.length) {
+    body.innerHTML = '<div class="status-msg">Keine Spieler dieser Jahrgänge gefunden.</div>';
+    return;
+  }
+
+  let html = '<ul class="jahrgang-player-list">';
+  for (const p of players) {
+    const up = parenSet.has(p.year);
+    const name = up ? '(' + p.name + ')' : p.name;
+    const meta = p.year + (p.lk && p.lk !== '–' ? ' · LK ' + _fmtLK(p.lk) : '');
+    html += '<li' + (up ? ' class="up"' : '') + '><span class="jp-name">' + esc(name) + '</span><span class="jp-meta">' + esc(meta) + '</span></li>';
+  }
+  html += '</ul>';
+  body.innerHTML = html;
+}
+
+function closeJahrgang() {
+  document.getElementById('jahrgang-modal').classList.remove('open');
 }
 
 async function showInfo(openAccordion) {
