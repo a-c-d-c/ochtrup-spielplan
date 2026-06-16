@@ -52,6 +52,12 @@
   .acc-feature-label { font-weight: 700; }
   #acc-statistik.open { max-height: 8000px; }
   #acc-mannschaft.open { max-height: 2000px; }
+  #acc-spielberechtigung.open { max-height: 2000px; }
+  .jahrgang-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; margin-top: 4px; }
+  .jahrgang-table th, .jahrgang-table td { padding: 7px 6px; text-align: left; border-bottom: 1px solid rgba(144,149,176,0.18); }
+  .jahrgang-table th { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.04em; opacity: 0.6; font-weight: 700; }
+  .jahrgang-table td:first-child { font-weight: 700; white-space: nowrap; }
+  .jahrgang-legend { font-size: 0.78rem; opacity: 0.7; margin-top: 10px; }
 </style>
 
 <div class="accordion-item">
@@ -172,6 +178,31 @@
   <div class="accordion-body" id="acc-mannschaft">
     <div class="accordion-body-inner">
       <div id="mannschaft-container"></div>
+    </div>
+  </div>
+</div>
+
+<div class="accordion-item">
+  <button class="accordion-btn" data-target="acc-spielberechtigung" onclick="toggleAccordion('acc-spielberechtigung')">
+    Spielberechtigung für Jugendmannschaften
+    <span class="accordion-arrow">▼</span>
+  </button>
+  <div class="accordion-body" id="acc-spielberechtigung">
+    <div class="accordion-body-inner">
+      <p>Spielberechtigte Geburtsjahrgänge der Jugend-Altersklassen. In Klammern stehen die Jahrgänge der nächsttieferen Altersklasse – diese Spieler dürfen eine Klasse höher mitspielen.</p>
+      <table class="jahrgang-table">
+        <thead>
+          <tr><th>Mannschaft</th><th>Winter 2026/27</th><th>Sommer 2027</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>U8/U9</td><td>–</td><td>2018–2019 u.&nbsp;jünger</td></tr>
+          <tr><td>U10</td><td>–</td><td>2017 (2018–2019)</td></tr>
+          <tr><td>U12</td><td>2015–2016 (2017)</td><td>2015–2016 (2017)</td></tr>
+          <tr><td>U15</td><td>2012–2014 (2015–2016)</td><td>2012–2014 (2015–2016)</td></tr>
+          <tr><td>U18</td><td>2009–2011 (2012–2014)</td><td>2009–2011 (2012–2014)</td></tr>
+        </tbody>
+      </table>
+      <p class="jahrgang-legend">In der Wintersaison werden nur Mannschaften der Altersklassen U12, U15 und U18 gemeldet (–&nbsp;= keine Meldung möglich). Quelle: WTV-Wettspielordnung Jugend.</p>
     </div>
   </div>
 </div>
