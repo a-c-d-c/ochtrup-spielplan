@@ -3425,25 +3425,21 @@ async function loadStatistik() {
   try {
     const LK_BASE = 'https://wtv.liga.nu/cgi-bin/WebObjects/nuLigaTENDE.woa/wa/clubRankinglistLK?federation=WTV&club=2015325';
 
-    // Begegnungen mit Spielbericht und gültigem Endergebnis — die Bilanz wird aus
-    // diesen Spielberichten gezählt (jedes Match genau einmal)
-    const reportMatches = allMatches.filter(m => m.reportUrl && /^\d+:\d+$/.test(m.result || ''));
-
     // Vereinsseite holen → alle Mannschafts-Kader (teamPortrait)
     const clubHtml = await fetchURL(CLUB_TEAMS_URL).catch(() => '');
     const rosters = parseClubRosters(clubHtml);
 
-    // LK-Listen, Kader und Spielberichte in einem Schwung laden
-    const results = await Promise.all([
+    // Phase 1: LK-Listen + Kader laden. Bestimmt, WER in der Statistik steht — bewusst
+    // getrennt von den Spielberichten, damit die Spielerliste vollständig bleibt, auch
+    // wenn später einzelne Bericht-Abrufe fehlschlagen oder gedrosselt werden.
+    const rosterResults = await Promise.all([
       fetchURL(LK_BASE + '&gender=1').catch(() => ''),
       fetchURL(LK_BASE + '&gender=0').catch(() => ''),
-      ...rosters.map(r => fetchURL(r.url).catch(() => null)),
-      ...reportMatches.map(m => fetchReport(m.reportUrl, true).catch(() => null))
+      ...rosters.map(r => fetchURL(r.url).catch(() => null))
     ]);
-    const lkHerren   = results[0];
-    const lkDamen    = results[1];
-    const rosterHtml = results.slice(2, 2 + rosters.length);
-    const reportHtml = results.slice(2 + rosters.length);
+    const lkHerren   = rosterResults[0];
+    const lkDamen    = rosterResults[1];
+    const rosterHtml = rosterResults.slice(2);
 
     // Aktueller LK + Geschlecht aus der LK-Vereinsübersicht (clubRankinglistLK): Name → {gender, lk}
     const lkInfo = {};
@@ -3468,8 +3464,11 @@ async function loadStatistik() {
       delete p.teamGenders;
     });
 
-    // Bilanz aus den Spielberichten zählen — jedes Match genau einmal, daher keine
-    // Doppelzählung mehr bei Spielern in mehreren Mannschaften/Wettbewerben
+    // Phase 2: Spielberichte laden und Bilanz zählen — jedes Match genau einmal, daher
+    // keine Doppelzählung bei Spielern in mehreren Mannschaften/Wettbewerben. Scheitert
+    // ein Abruf, fehlt nur dessen Bilanz — die Spielerliste (Phase 1) bleibt vollständig.
+    const reportMatches = allMatches.filter(m => m.reportUrl && /^\d+:\d+$/.test(m.result || ''));
+    const reportHtml = await Promise.all(reportMatches.map(m => fetchReport(m.reportUrl, true).catch(() => null)));
     for (let i = 0; i < reportMatches.length; i++) {
       if (reportHtml[i]) parseReportStats(reportHtml[i], reportMatches[i], playerMap);
     }
