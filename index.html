@@ -2971,7 +2971,7 @@ async function showJahrgang(klasse, primaryStr, parenStr, gender) {
     const box = (title, arr) => `<div class="jahrgang-box"><div class="jahrgang-box-title">${title}</div>`
       + (arr.length ? '<ul class="jahrgang-player-list">' + renderLis(arr) + '</ul>' : '<div class="status-msg">Keine Spieler.</div>')
       + '</div>';
-    body.innerHTML = box('Herren', herren) + box('Damen', damen);
+    body.innerHTML = box('Junioren', herren) + box('Juniorinnen', damen);
   } else {
     body.innerHTML = '<ul class="jahrgang-player-list">' + renderLis(players) + '</ul>';
   }
