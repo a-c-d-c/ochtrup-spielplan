@@ -56,7 +56,7 @@
   .jahrgang-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; margin-top: 4px; }
   .jahrgang-table th, .jahrgang-table td { padding: 7px 6px; text-align: left; border-bottom: 1px solid rgba(144,149,176,0.18); }
   .jahrgang-table th { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.04em; opacity: 0.6; font-weight: 700; }
-  .jahrgang-table td:first-child { font-weight: 700; white-space: nowrap; }
+  .jahrgang-table td:first-child { font-weight: 700; }
   .jahrgang-legend { font-size: 0.78rem; opacity: 0.7; margin-top: 10px; }
   .jahrgang-link { color: inherit; text-decoration: underline; text-decoration-style: dotted; text-underline-offset: 3px; cursor: pointer; }
 </style>
@@ -199,15 +199,24 @@
           <tr><td>U8</td><td>—</td><td>2019, 2020, 2021</td></tr>
           <tr><td>U9</td><td>—</td><td>2018 (2019, 2020, 2021)</td></tr>
           <tr><td>U10</td><td>—</td><td>2017 (2018)</td></tr>
-          <tr><td>U12</td>
-            <td><span class="jahrgang-link" onclick="showJahrgang('U12','2015, 2016','2017')">2015, 2016 (2017)</span></td>
-            <td><span class="jahrgang-link" onclick="showJahrgang('U12','2015, 2016','2017')">2015, 2016 (2017)</span></td></tr>
-          <tr><td>U15</td>
-            <td><span class="jahrgang-link" onclick="showJahrgang('U15','2012, 2013, 2014','2015, 2016')">2012, 2013, 2014 (2015, 2016)</span></td>
-            <td><span class="jahrgang-link" onclick="showJahrgang('U15','2012, 2013, 2014','2015, 2016')">2012, 2013, 2014 (2015, 2016)</span></td></tr>
-          <tr><td>U18</td>
-            <td><span class="jahrgang-link" onclick="showJahrgang('U18','2009, 2010, 2011','2012, 2013, 2014')">2009, 2010, 2011 (2012, 2013, 2014)</span></td>
-            <td><span class="jahrgang-link" onclick="showJahrgang('U18','2009, 2010, 2011','2012, 2013, 2014')">2009, 2010, 2011 (2012, 2013, 2014)</span></td></tr>
+          <tr><td>U12 Junioren</td>
+            <td><span class="jahrgang-link" onclick="showJahrgang('U12 Junioren','2015, 2016','2017','m')">2015, 2016 (2017)</span></td>
+            <td><span class="jahrgang-link" onclick="showJahrgang('U12 Junioren','2015, 2016','2017','m')">2015, 2016 (2017)</span></td></tr>
+          <tr><td>U12 Juniorinnen</td>
+            <td><span class="jahrgang-link" onclick="showJahrgang('U12 Juniorinnen','2015, 2016','2017','w')">2015, 2016 (2017)</span></td>
+            <td><span class="jahrgang-link" onclick="showJahrgang('U12 Juniorinnen','2015, 2016','2017','w')">2015, 2016 (2017)</span></td></tr>
+          <tr><td>U15 Junioren</td>
+            <td><span class="jahrgang-link" onclick="showJahrgang('U15 Junioren','2012, 2013, 2014','2015, 2016','m')">2012, 2013, 2014 (2015, 2016)</span></td>
+            <td><span class="jahrgang-link" onclick="showJahrgang('U15 Junioren','2012, 2013, 2014','2015, 2016','m')">2012, 2013, 2014 (2015, 2016)</span></td></tr>
+          <tr><td>U15 Juniorinnen</td>
+            <td><span class="jahrgang-link" onclick="showJahrgang('U15 Juniorinnen','2012, 2013, 2014','2015, 2016','w')">2012, 2013, 2014 (2015, 2016)</span></td>
+            <td><span class="jahrgang-link" onclick="showJahrgang('U15 Juniorinnen','2012, 2013, 2014','2015, 2016','w')">2012, 2013, 2014 (2015, 2016)</span></td></tr>
+          <tr><td>U18 Junioren</td>
+            <td><span class="jahrgang-link" onclick="showJahrgang('U18 Junioren','2009, 2010, 2011','2012, 2013, 2014','m')">2009, 2010, 2011 (2012, 2013, 2014)</span></td>
+            <td><span class="jahrgang-link" onclick="showJahrgang('U18 Junioren','2009, 2010, 2011','2012, 2013, 2014','m')">2009, 2010, 2011 (2012, 2013, 2014)</span></td></tr>
+          <tr><td>U18 Juniorinnen</td>
+            <td><span class="jahrgang-link" onclick="showJahrgang('U18 Juniorinnen','2009, 2010, 2011','2012, 2013, 2014','w')">2009, 2010, 2011 (2012, 2013, 2014)</span></td>
+            <td><span class="jahrgang-link" onclick="showJahrgang('U18 Juniorinnen','2009, 2010, 2011','2012, 2013, 2014','w')">2009, 2010, 2011 (2012, 2013, 2014)</span></td></tr>
         </tbody>
       </table>
       <p class="jahrgang-legend"><em>Jahrgänge in Klammern spielen eine Klasse höher als ihre originäre Altersklasse (maximal eine Klasse).</em></p>

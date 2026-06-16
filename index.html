@@ -724,6 +724,8 @@
 
   /* ── Statistik-Tabelle ── */
   #statistik-container { overflow-x: auto; -webkit-overflow-scrolling: touch; margin-top: 4px; }
+  .stat-gender-row { display: flex; gap: 6px; margin-bottom: 12px; }
+  .stat-gender-row .btn { flex: 1; min-width: 0; text-align: center; padding: 9px 6px; font-size: 0.78rem; }
   .stat-table { width: 100%; border-collapse: collapse; font-size: 0.78rem; }
   .stat-table th {
     padding: 7px 6px; text-align: left;
@@ -922,6 +924,7 @@
   .jahrgang-player-list { list-style: none; margin: 0; padding: 0; }
   .jahrgang-player-list li { display: flex; justify-content: space-between; gap: 10px; padding: 8px 2px; border-bottom: 1px solid rgba(144,149,176,0.14); font-size: 0.9rem; }
   .jahrgang-player-list li.up .jp-name { opacity: 0.65; font-style: italic; }
+  .jahrgang-player-list li.played .jp-name { font-weight: 800; color: #fff; }
   .jp-name { font-weight: 600; }
   .jp-meta { opacity: 0.7; font-size: 0.8rem; white-space: nowrap; }
   .jahrgang-modal-close { width: 100%; margin-top: 16px; padding: 13px; background: rgba(144,149,176,0.12); border: 1px solid rgba(144,149,176,0.5); border-radius: 22px; color: #c8cade; font-family: inherit; font-size: 0.95rem; font-weight: 600; cursor: pointer; }
@@ -2899,7 +2902,7 @@ function _parseYears(str) {
   return (str || '').split(',').map(s => s.trim()).filter(Boolean);
 }
 
-async function showJahrgang(klasse, primaryStr, parenStr) {
+async function showJahrgang(klasse, primaryStr, parenStr, gender) {
   const primary = _parseYears(primaryStr);
   const paren   = _parseYears(parenStr);
   const title = document.getElementById('jahrgang-modal-title');
@@ -2920,9 +2923,12 @@ async function showJahrgang(klasse, primaryStr, parenStr) {
 
   const parenSet = new Set(paren);
   const wanted = new Set([...primary, ...paren]);
+  const hasPlayed = p => (p.einzelWins + p.einzelLosses + p.doppelWins + p.doppelLosses) > 0;
+  // Reihenfolge: 0 = gespielt (fett), 1 = spielberechtigt ohne Bilanz, 2 = eine Klasse tiefer (Klammern)
+  const rank = p => parenSet.has(p.year) ? 2 : (hasPlayed(p) ? 0 : 1);
   const players = _statistikData
-    .filter(p => p.year && wanted.has(p.year))
-    .sort((a, b) => (a.year !== b.year) ? a.year.localeCompare(b.year) : a.name.localeCompare(b.name, 'de'));
+    .filter(p => p.year && wanted.has(p.year) && (!gender || p.gender === gender))
+    .sort((a, b) => (rank(a) - rank(b)) || a.year.localeCompare(b.year) || a.name.localeCompare(b.name, 'de'));
 
   if (!players.length) {
     body.innerHTML = '<div class="status-msg">Keine Spieler dieser Jahrgänge gefunden.</div>';
@@ -2932,9 +2938,14 @@ async function showJahrgang(klasse, primaryStr, parenStr) {
   let html = '<ul class="jahrgang-player-list">';
   for (const p of players) {
     const up = parenSet.has(p.year);
+    const gw = p.einzelWins + p.doppelWins, gl = p.einzelLosses + p.doppelLosses;
+    const played = (gw + gl) > 0;
+    const cls = up ? 'up' : (played ? 'played' : '');
     const name = up ? '(' + p.name + ')' : p.name;
-    const meta = p.year + (p.lk && p.lk !== '–' ? ' · LK ' + _fmtLK(p.lk) : '');
-    html += '<li' + (up ? ' class="up"' : '') + '><span class="jp-name">' + esc(name) + '</span><span class="jp-meta">' + esc(meta) + '</span></li>';
+    let meta = p.year;
+    if (p.lk && p.lk !== '–') meta += ' · LK ' + _fmtLK(p.lk);
+    if (played) meta += ' · ' + gw + ':' + gl;
+    html += '<li' + (cls ? ' class="' + cls + '"' : '') + '><span class="jp-name">' + esc(name) + '</span><span class="jp-meta">' + esc(meta) + '</span></li>';
   }
   html += '</ul>';
   body.innerHTML = html;
@@ -3350,6 +3361,7 @@ if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
 /* ── Statistik ─────────────────────────────────────────────── */
 let _statistikData = null;
 let _statistikSort = { col: 'gesamt', dir: -1 };
+let _statistikGenders = new Set(['m', 'w', 'x']);
 
 async function loadStatistik() {
   const container = document.getElementById('statistik-container');
@@ -3368,8 +3380,8 @@ async function loadStatistik() {
       ...reportMatches.map(m => fetchURL(m.reportUrl).catch(() => null))
     ]);
 
-    const playerMap = parseLKList(lkHerren);
-    Object.assign(playerMap, parseLKList(lkDamen));
+    const playerMap = parseLKList(lkHerren, 'm');
+    Object.assign(playerMap, parseLKList(lkDamen, 'w'));
 
     for (let i = 0; i < reportMatches.length; i++) {
       if (reportResults[i]) parseReportStats(reportResults[i], reportMatches[i], playerMap);
@@ -3385,7 +3397,7 @@ async function loadStatistik() {
   }
 }
 
-function parseLKList(html) {
+function parseLKList(html, gender) {
   // Table columns: 0=DGR, 1=LK, 2=ID, 3=Name (Jahrgang), 4=Bemerkung, 5=Nation, 6=Stichtags LK
   const doc = new DOMParser().parseFromString(html, 'text/html');
   const map = {};
@@ -3401,7 +3413,7 @@ function parseLKList(html) {
     const name  = cellTxt.replace(/\s*\(\d{4}\)\s*$/, '').trim();
     const yearM = cellTxt.match(/\((\d{4})\)/);
     const year  = yearM ? yearM[1] : '';
-    if (name) map[_normName(name)] = { name, year, lk, einzelWins: 0, einzelLosses: 0, doppelWins: 0, doppelLosses: 0 };
+    if (name) map[_normName(name)] = { name, year, lk, gender, einzelWins: 0, einzelLosses: 0, doppelWins: 0, doppelLosses: 0 };
   });
   return map;
 }
@@ -3487,7 +3499,7 @@ function _normName(n) {
 
 function _addStat(playerMap, name, type, won) {
   const key = _normName(name);
-  if (!playerMap[key]) playerMap[key] = { name, lk: '–', einzelWins: 0, einzelLosses: 0, doppelWins: 0, doppelLosses: 0 };
+  if (!playerMap[key]) playerMap[key] = { name, lk: '–', gender: 'x', einzelWins: 0, einzelLosses: 0, doppelWins: 0, doppelLosses: 0 };
   if (won) playerMap[key][type + 'Wins']++;
   else     playerMap[key][type + 'Losses']++;
 }
@@ -3514,7 +3526,7 @@ function _fmtLK(lk) {
 function renderStatistikTable(container) {
   const col = _statistikSort.col;
   const dir = _statistikSort.dir;
-  const data = [..._statistikData].sort((a, b) => {
+  const data = _statistikData.filter(p => _statistikGenders.has(p.gender)).sort((a, b) => {
     let cmp;
     if (col === 'name') {
       cmp = a.name.localeCompare(b.name, 'de');
@@ -3542,7 +3554,17 @@ function renderStatistikTable(container) {
     return `<th class="sortable${arrow}" onclick="sortStatistik('${id}')">${label}</th>`;
   };
 
-  let html = `<table class="stat-table"><thead><tr>
+  const genderBtn = (g, label) => `<button class="btn btn-filter${_statistikGenders.has(g) ? ' on' : ''}" onclick="toggleStatistikGender('${g}')">${label}</button>`;
+
+  let html = `<div class="stat-gender-row">${genderBtn('m', 'Herren')}${genderBtn('w', 'Damen')}${genderBtn('x', 'Ohne LK')}</div>`;
+
+  if (!data.length) {
+    html += '<div class="status-msg">' + (_statistikGenders.size ? 'Keine Spieler in dieser Liste.' : 'Bitte Herren und/oder Damen auswählen.') + '</div>';
+    container.innerHTML = html;
+    return;
+  }
+
+  html += `<table class="stat-table"><thead><tr>
     ${th('name','Name')}${th('jahrg','Jahrg.')}${th('lk','LK')}${th('gesamt','Gesamt')}${th('einzel','Einzel')}${th('doppel','Doppel')}
   </tr></thead><tbody>`;
 
@@ -3571,6 +3593,13 @@ function sortStatistik(col) {
   }
   _statistikSort.col = col;
   renderStatistikTable(container);
+}
+
+function toggleStatistikGender(g) {
+  if (_statistikGenders.has(g)) _statistikGenders.delete(g);
+  else _statistikGenders.add(g);
+  const container = document.getElementById('statistik-container');
+  if (container && _statistikData) renderStatistikTable(container);
 }
 
 /* ── Mannschaftsstatistik ───────────────────────────────────── */
