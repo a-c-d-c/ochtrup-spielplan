@@ -2930,7 +2930,7 @@ async function showJahrgang(klasse, primaryStr, parenStr, gender) {
   const rank = p => parenSet.has(effYear(p)) ? 2 : (hasPlayed(p) ? 0 : 1);
   const lkVal = p => parseFloat(p.lk) || 99;
   const players = _statistikData
-    .filter(p => { const y = effYear(p); return y && wanted.has(y) && (!gender || effGender(p) === gender); })
+    .filter(p => { const y = effYear(p); return y && wanted.has(y) && (!gender || effGender(p) === gender || !effGender(p)); })
     .sort((a, b) => (rank(a) - rank(b)) || (lkVal(a) - lkVal(b)) || a.name.localeCompare(b.name, 'de'));
 
   if (!players.length) {
@@ -3367,6 +3367,19 @@ let _statistikData = null;
 let _statistikSort = { col: 'gesamt', dir: -1 };
 let _statistikGenders = new Set(['m', 'w', 'x']);
 
+/* Vornamen-Geschlecht (Fallback, wenn weder LK-Liste noch Mannschaftsname das Geschlecht liefern) */
+const NAME_GENDER = {};
+'moritz paul niklas til jona jonas noah elias eliah elia felix henri henrik mats matti mattis luis louis johann johannes bastian thomas tom tim timo tobias simon sebastian florian fabian nico niko marvin marcel kevin dennis jannik jannis yannik yannick janosch malte lasse ole mika emil oskar oscar anton theo theodor karl carl ludwig friedrich ferdinand frederik fred linus levi levin hannes piet bjarne thore arne nils niels sven soenke joris hugo otto kilian valentin vincent constantin konstantin raphael gabriel samuel adrian alexander andreas christian markus martin michael peter klaus stefan stephan wolfgang juergen dieter benedikt joshua matteo aaron ben bennet bennett leon lukas lucas finn fynn jakob jacob jan jonathan david daniel philipp philip maximilian max pepe julian laurenz jannic'
+  .split(/\s+/).forEach(n => NAME_GENDER[n] = 'm');
+'marlene anna anne lena lara lina mia mila emma ella hanna hannah clara klara nina marie marleen madlen malena leonie mariele linda illiana celina luna lisa cathrin katrin katharina wenke lea melina svea verena inga ina mareike sabrina linn anastasia sophia sofia sophie sofie johanna josephine charlotte frieda frida ida greta mathilda matilda maja maya paula pauline luisa louisa elisa amelie emilie emily isabel isabella laura julia juliana jana jasmin jessica vanessa michelle melanie nadine sandra claudia petra andrea birgit gabriele monika martina susanne sabine kerstin heike anja antje silke britta carina karina nele neele finja fiona romy ronja merle mara tessa helena helene magdalena theresa teresa victoria viktoria carlotta carla caroline pia selina'
+  .split(/\s+/).forEach(n => NAME_GENDER[n] = 'w');
+
+function _guessGenderByName(fullName) {
+  const after = (String(fullName).split(',')[1] || '').trim();
+  const first = (after.split(/\s+/)[0] || '').toLowerCase().replace(/[^a-zäöüß]/g, '');
+  return NAME_GENDER[first] || '';
+}
+
 async function loadStatistik() {
   const container = document.getElementById('statistik-container');
   if (!container) return;
@@ -3402,7 +3415,8 @@ async function loadStatistik() {
     Object.values(playerMap).forEach(p => {
       const key   = _normName(p.name);
       const teamG = p.teamGenders.size === 1 ? [...p.teamGenders][0] : '';
-      p.realGender = genderMap[key] || teamG || '';            // für Spielberechtigung
+      p.realGender = genderMap[key] || teamG || _guessGenderByName(p.name) || '';  // für Spielberechtigung
+
       p.gender     = (p.lk !== '–') ? (genderMap[key] || teamG || 'x') : 'x'; // Statistik-Filter (Herren/Damen/Ohne LK)
       delete p.teamGenders;
     });
