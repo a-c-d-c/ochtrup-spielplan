@@ -2923,12 +2923,14 @@ async function showJahrgang(klasse, primaryStr, parenStr, gender) {
 
   const parenSet = new Set(paren);
   const wanted = new Set([...primary, ...paren]);
+  const effYear   = p => p.year;
+  const effGender = p => p.realGender;
   const hasPlayed = p => (p.einzelWins + p.einzelLosses + p.doppelWins + p.doppelLosses) > 0;
   // Reihenfolge: 0 = gespielt (fett), 1 = spielberechtigt ohne Bilanz, 2 = eine Klasse tiefer (Klammern)
-  const rank = p => parenSet.has(p.year) ? 2 : (hasPlayed(p) ? 0 : 1);
+  const rank = p => parenSet.has(effYear(p)) ? 2 : (hasPlayed(p) ? 0 : 1);
   const lkVal = p => parseFloat(p.lk) || 99;
   const players = _statistikData
-    .filter(p => p.year && wanted.has(p.year) && (!gender || p.gender === gender))
+    .filter(p => { const y = effYear(p); return y && wanted.has(y) && (!gender || effGender(p) === gender); })
     .sort((a, b) => (rank(a) - rank(b)) || (lkVal(a) - lkVal(b)) || a.name.localeCompare(b.name, 'de'));
 
   if (!players.length) {
@@ -2938,12 +2940,13 @@ async function showJahrgang(klasse, primaryStr, parenStr, gender) {
 
   let html = '<ul class="jahrgang-player-list">';
   for (const p of players) {
-    const up = parenSet.has(p.year);
+    const year = effYear(p);
+    const up = parenSet.has(year);
     const gw = p.einzelWins + p.doppelWins, gl = p.einzelLosses + p.doppelLosses;
     const played = (gw + gl) > 0;
     const cls = up ? 'up' : (played ? 'played' : '');
     const name = up ? '(' + p.name + ')' : p.name;
-    let meta = p.year;
+    let meta = year;
     if (p.lk && p.lk !== '–') meta += ' · LK ' + _fmtLK(p.lk);
     if (played) meta += ' · ' + gw + ':' + gl;
     html += '<li' + (cls ? ' class="' + cls + '"' : '') + '><span class="jp-name">' + esc(name) + '</span><span class="jp-meta">' + esc(meta) + '</span></li>';
@@ -3372,30 +3375,94 @@ async function loadStatistik() {
   container.innerHTML = '<div class="loading-row"><div class="spinner"></div>Daten werden geladen …</div>';
 
   try {
-    const reportMatches = allMatches.filter(m => m.reportUrl && /^\d+:\d+$/.test(m.result || ''));
     const LK_BASE = 'https://wtv.liga.nu/cgi-bin/WebObjects/nuLigaTENDE.woa/wa/clubRankinglistLK?federation=WTV&club=2015325';
 
-    const [lkHerren, lkDamen, ...reportResults] = await Promise.all([
+    // Vereinsseite holen → alle Mannschafts-Kader (teamPortrait)
+    const clubHtml = await fetchURL(CLUB_TEAMS_URL).catch(() => '');
+    const rosters = parseClubRosters(clubHtml);
+
+    const [lkHerren, lkDamen, ...rosterHtml] = await Promise.all([
       fetchURL(LK_BASE + '&gender=1').catch(() => ''),
       fetchURL(LK_BASE + '&gender=0').catch(() => ''),
-      ...reportMatches.map(m => fetchURL(m.reportUrl).catch(() => null))
+      ...rosters.map(r => fetchURL(r.url).catch(() => null))
     ]);
 
-    const playerMap = parseLKList(lkHerren, 'm');
-    Object.assign(playerMap, parseLKList(lkDamen, 'w'));
+    // Geschlecht aus den LK-Listen (autoritativ): Name → m/w
+    const genderMap = {};
+    Object.keys(parseLKList(lkHerren, 'm')).forEach(k => genderMap[k] = 'm');
+    Object.keys(parseLKList(lkDamen,  'w')).forEach(k => genderMap[k] = 'w');
 
-    for (let i = 0; i < reportMatches.length; i++) {
-      if (reportResults[i]) parseReportStats(reportResults[i], reportMatches[i], playerMap);
+    // Spieler aus allen gemeldeten Kadern aufbauen (mit Jahrgang, LK, Bilanz)
+    const playerMap = {};
+    for (let i = 0; i < rosters.length; i++) {
+      if (rosterHtml[i]) parseTeamRoster(rosterHtml[i], rosters[i].label, playerMap);
     }
 
-    _statistikData = Object.values(playerMap).filter(p =>
-      p.lk !== '–' || p.einzelWins + p.einzelLosses + p.doppelWins + p.doppelLosses > 0);
+    // Geschlecht festlegen: LK-Liste > eindeutige Mannschafts-Zuordnung (Junioren/Herren=m, Juniorinnen/Damen=w)
+    Object.values(playerMap).forEach(p => {
+      const key   = _normName(p.name);
+      const teamG = p.teamGenders.size === 1 ? [...p.teamGenders][0] : '';
+      p.realGender = genderMap[key] || teamG || '';            // für Spielberechtigung
+      p.gender     = (p.lk !== '–') ? (genderMap[key] || teamG || 'x') : 'x'; // Statistik-Filter (Herren/Damen/Ohne LK)
+      delete p.teamGenders;
+    });
+
+    _statistikData = Object.values(playerMap);
 
     renderStatistikTable(container);
   } catch(e) {
     container.innerHTML = '<div class="status-msg">Statistik konnte nicht geladen werden.</div>';
     container.dataset.loaded = '';
   }
+}
+
+/* Liste aller Mannschafts-Kader (teamPortrait-Links) von der Vereinsseite */
+function parseClubRosters(html) {
+  const decoded = (html || '').replace(/&amp;/g, '&');
+  const re = /title="Mannschaftsportrait"\s+href="([^"]*teamPortrait[^"]*)">([^<]+)</g;
+  const out = [];
+  const seen = new Set();
+  let m;
+  while ((m = re.exec(decoded)) !== null) {
+    const url = m[1].startsWith('http') ? m[1] : 'https://wtv.liga.nu' + m[1];
+    if (seen.has(url)) continue;
+    seen.add(url);
+    out.push({ url, label: m[2].trim() });
+  }
+  return out;
+}
+
+/* Spieler-Tabelle einer teamPortrait-Seite parsen → playerMap füllen/ergänzen */
+function parseTeamRoster(html, label, playerMap) {
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  const table = [...doc.querySelectorAll('table')].find(t => /Name,\s*Vorname/i.test(t.textContent));
+  if (!table) return;
+  const teamGender = /junioren\b|herren/i.test(label) ? 'm'
+                   : /juniorinnen|damen/i.test(label) ? 'w' : '';
+  [...table.rows].forEach(row => {
+    if (row.querySelectorAll('th').length) return;
+    const cells = [...row.cells];
+    if (cells.length < 6) return;
+    const nameCell = cells.find(c => /\(\d{4}\)/.test(c.textContent) && c.textContent.includes(','));
+    if (!nameCell) return;
+    const year = (nameCell.textContent.match(/\((\d{4})\)/) || [])[1] || '';
+    let name = ((nameCell.querySelector('a') || nameCell).textContent || '')
+      .replace(/\s*\(\d{4}\)[\s\S]*$/, '').replace(/\s+/g, ' ').trim();
+    if (!name.includes(',')) return;
+    const lkCell = cells.find(c => /^LK[\d.,]+$/.test(c.textContent.trim()));
+    const lk = lkCell ? lkCell.textContent.trim().replace(/^LK/, '').replace(',', '.') : '–';
+    const einzel = (cells[cells.length - 3] || { textContent: '-' }).textContent.trim();
+    const doppel = (cells[cells.length - 2] || { textContent: '-' }).textContent.trim();
+    const key = _normName(name);
+    let p = playerMap[key];
+    if (!p) p = playerMap[key] = { name, year, lk: '–', gender: '', realGender: '', teamGenders: new Set(), einzelWins: 0, einzelLosses: 0, doppelWins: 0, doppelLosses: 0 };
+    if (year && !p.year) p.year = year;
+    if (lk !== '–') p.lk = lk;
+    if (teamGender) p.teamGenders.add(teamGender);
+    const add = (val, type) => { const mm = val.match(/^(\d+):(\d+)$/); if (mm) { p[type + 'Wins'] += +mm[1]; p[type + 'Losses'] += +mm[2]; } };
+    add(einzel, 'einzel');
+    add(doppel, 'doppel');
+  });
 }
 
 function parseLKList(html, gender) {
