@@ -927,6 +927,9 @@
   }
   .jahrgang-modal-title { font-family: 'Bebas Neue', sans-serif; font-size: 1.5rem; letter-spacing: 0.06em; color: #fff; margin: 0 0 2px; }
   .jahrgang-modal-sub { font-size: 0.8rem; opacity: 0.65; margin: 0 0 14px; }
+  .jahrgang-box { border: 1px solid rgba(144,149,176,0.3); border-radius: 12px; padding: 10px 12px; margin-bottom: 12px; }
+  .jahrgang-box:last-child { margin-bottom: 0; }
+  .jahrgang-box-title { font-family: 'Bebas Neue', sans-serif; font-size: 1.1rem; letter-spacing: 0.05em; color: #fff; margin-bottom: 4px; }
   .jahrgang-player-list { list-style: none; margin: 0; padding: 0; }
   .jahrgang-player-list li { display: flex; justify-content: space-between; gap: 10px; padding: 8px 2px; border-bottom: 1px solid rgba(144,149,176,0.14); font-size: 0.9rem; }
   .jahrgang-player-list li.up .jp-name { opacity: 0.65; font-style: italic; }
@@ -2944,21 +2947,34 @@ async function showJahrgang(klasse, primaryStr, parenStr, gender) {
     return;
   }
 
-  let html = '<ul class="jahrgang-player-list">';
-  for (const p of players) {
-    const year = effYear(p);
-    const up = parenSet.has(year);
-    const gw = p.einzelWins + p.doppelWins, gl = p.einzelLosses + p.doppelLosses;
-    const played = (gw + gl) > 0;
-    const cls = up ? 'up' : (played ? 'played' : '');
-    const name = up ? '(' + p.name + ')' : p.name;
-    let meta = year;
-    if (p.lk && p.lk !== '–') meta += ' · LK ' + _fmtLK(p.lk);
-    if (played) meta += ' · ' + gw + ':' + gl;
-    html += '<li' + (cls ? ' class="' + cls + '"' : '') + '><span class="jp-name">' + esc(name) + '</span><span class="jp-meta">' + esc(meta) + '</span></li>';
+  const renderLis = arr => {
+    let h = '';
+    for (const p of arr) {
+      const year = effYear(p);
+      const up = parenSet.has(year);
+      const gw = p.einzelWins + p.doppelWins, gl = p.einzelLosses + p.doppelLosses;
+      const played = (gw + gl) > 0;
+      const cls = up ? 'up' : (played ? 'played' : '');
+      const name = up ? '(' + p.name + ')' : p.name;
+      let meta = year;
+      if (p.lk && p.lk !== '–') meta += ' · LK ' + _fmtLK(p.lk);
+      if (played) meta += ' · ' + gw + ':' + gl;
+      h += '<li' + (cls ? ' class="' + cls + '"' : '') + '><span class="jp-name">' + esc(name) + '</span><span class="jp-meta">' + esc(meta) + '</span></li>';
+    }
+    return h;
+  };
+
+  if (/mixed/i.test(klasse)) {
+    // Mixed: zwei umrandete Kästen – Herren zuerst, dann Damen (unbekannt erscheint in beiden)
+    const herren = players.filter(p => p.realGender !== 'w');
+    const damen  = players.filter(p => p.realGender !== 'm');
+    const box = (title, arr) => `<div class="jahrgang-box"><div class="jahrgang-box-title">${title}</div>`
+      + (arr.length ? '<ul class="jahrgang-player-list">' + renderLis(arr) + '</ul>' : '<div class="status-msg">Keine Spieler.</div>')
+      + '</div>';
+    body.innerHTML = box('Herren', herren) + box('Damen', damen);
+  } else {
+    body.innerHTML = '<ul class="jahrgang-player-list">' + renderLis(players) + '</ul>';
   }
-  html += '</ul>';
-  body.innerHTML = html;
 }
 
 function closeJahrgang() {
