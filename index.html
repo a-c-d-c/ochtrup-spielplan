@@ -3424,10 +3424,11 @@ async function loadStatistik() {
       ...rosters.map(r => fetchURL(r.url).catch(() => null))
     ]);
 
-    // Geschlecht aus den LK-Listen (autoritativ): Name → m/w
-    const genderMap = {};
-    Object.keys(parseLKList(lkHerren, 'm')).forEach(k => genderMap[k] = 'm');
-    Object.keys(parseLKList(lkDamen,  'w')).forEach(k => genderMap[k] = 'w');
+    // Aktueller LK + Geschlecht aus der LK-Vereinsübersicht (clubRankinglistLK): Name → {gender, lk}
+    const lkInfo = {};
+    const addLK = (html, g) => { const map = parseLKList(html, g); Object.keys(map).forEach(k => lkInfo[k] = { gender: g, lk: map[k].lk }); };
+    addLK(lkHerren, 'm');
+    addLK(lkDamen,  'w');
 
     // Spieler aus allen gemeldeten Kadern aufbauen (mit Jahrgang, LK, Bilanz)
     const playerMap = {};
@@ -3438,8 +3439,10 @@ async function loadStatistik() {
     // Geschlecht festlegen: LK-Liste > eindeutige Mannschafts-Zuordnung (Junioren/Herren=m, Juniorinnen/Damen=w)
     Object.values(playerMap).forEach(p => {
       const key   = _normName(p.name);
+      const info  = lkInfo[key];
+      if (info && info.lk && info.lk !== '–') p.lk = info.lk; // aktuellen LK übernehmen (statt Melde-LK aus teamPortrait)
       const teamG = p.teamGenders.size === 1 ? [...p.teamGenders][0] : '';
-      p.realGender = genderMap[key] || teamG || _guessGenderByName(p.name) || '';
+      p.realGender = (info && info.gender) || teamG || _guessGenderByName(p.name) || '';
       p.gender     = p.realGender; // Statistik-Filter (Herren/Damen); LK-lose nach Geschlecht einsortiert
       delete p.teamGenders;
     });
