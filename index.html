@@ -3445,6 +3445,7 @@ async function loadStatistik() {
       p.realGender = (info && info.gender) || teamG || _guessGenderByName(p.name) || '';
       p.gender     = p.realGender; // Statistik-Filter (Herren/Damen); LK-lose nach Geschlecht einsortiert
       delete p.teamGenders;
+      delete p.balanceGroups;
     });
 
     _statistikData = Object.values(playerMap);
@@ -3479,6 +3480,10 @@ function parseTeamRoster(html, label, playerMap) {
   if (!table) return;
   const teamGender = /junioren\b|herren/i.test(label) ? 'm'
                    : /juniorinnen|damen/i.test(label) ? 'w' : '';
+  // Altersgruppe ohne Team-Nummer: "Herren 40 4er 1" → "Herren 40 4er"
+  // liga.nu zeigt für Teams derselben Gruppe (1, 2, …) dieselbe kombinierte
+  // Spielerbilanz auf jeder Mannschaftsseite — daher pro Gruppe nur einmal zählen.
+  const groupKey = label.replace(/\s+\d+$/, '').trim();
   [...table.rows].forEach(row => {
     if (row.querySelectorAll('th').length) return;
     const cells = [...row.cells];
@@ -3495,13 +3500,19 @@ function parseTeamRoster(html, label, playerMap) {
     const doppel = (cells[cells.length - 2] || { textContent: '-' }).textContent.trim();
     const key = _normName(name);
     let p = playerMap[key];
-    if (!p) p = playerMap[key] = { name, year, lk: '–', gender: '', realGender: '', teamGenders: new Set(), einzelWins: 0, einzelLosses: 0, doppelWins: 0, doppelLosses: 0 };
+    if (!p) p = playerMap[key] = { name, year, lk: '–', gender: '', realGender: '', teamGenders: new Set(), balanceGroups: new Set(), einzelWins: 0, einzelLosses: 0, doppelWins: 0, doppelLosses: 0 };
     if (year && !p.year) p.year = year;
     if (lk !== '–') p.lk = lk;
     if (teamGender) p.teamGenders.add(teamGender);
-    const add = (val, type) => { const mm = val.match(/^(\d+):(\d+)$/); if (mm) { p[type + 'Wins'] += +mm[1]; p[type + 'Losses'] += +mm[2]; } };
-    add(einzel, 'einzel');
-    add(doppel, 'doppel');
+    // Bilanz nur einmal pro Altersgruppe übernehmen (sonst Doppelzählung bei
+    // gemeinsamem Kader von „… 1" und „… 2")
+    if (!p.balanceGroups) p.balanceGroups = new Set();
+    if (!p.balanceGroups.has(groupKey)) {
+      p.balanceGroups.add(groupKey);
+      const add = (val, type) => { const mm = val.match(/^(\d+):(\d+)$/); if (mm) { p[type + 'Wins'] += +mm[1]; p[type + 'Losses'] += +mm[2]; } };
+      add(einzel, 'einzel');
+      add(doppel, 'doppel');
+    }
   });
 }
 
