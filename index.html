@@ -1849,6 +1849,7 @@ let showAway    = _state.showAway;
 let showTeams   = _state.showTeams;
 let selectMode  = _state.selectMode;
 const leagueHtml = {};
+const _reportCache = {}; // Session-Cache für Spielberichte (reportUrl → HTML)
 
 function getCachedHtml(key) {
   try {
@@ -1917,6 +1918,15 @@ async function fetchURL(targetUrl) {
   } catch(e) {
     throw new Error('Alle Proxies fehlgeschlagen (' + (e.message || '') + ')');
   }
+}
+
+/* Spielbericht laden — abgeschlossene Begegnungen werden im Session-Cache gehalten
+   (Statistik + erneutes Öffnen sofort), laufende immer frisch geladen */
+async function fetchReport(reportUrl, useCache) {
+  if (useCache && _reportCache[reportUrl]) return _reportCache[reportUrl];
+  const html = await fetchURL(reportUrl);
+  if (useCache) _reportCache[reportUrl] = html;
+  return html;
 }
 
 /* ── Parse ─────────────────────────────────────────────────── */
@@ -3036,7 +3046,8 @@ async function showReport(team, reportUrl, matchObj) {
     '<div class="loading-row"><div class="spinner"></div>Spielbericht wird geladen …</div>';
 
   try {
-    const html = await fetchURL(reportUrl);
+    const isFinal = !!(matchObj && /^\d+:\d+$/.test(matchObj.result || ''));
+    const html = await fetchReport(reportUrl, isFinal);
     document.getElementById('report-content').innerHTML = renderReport(html, matchObj);
     fitReportTeams();
   } catch(e) {
@@ -3414,15 +3425,25 @@ async function loadStatistik() {
   try {
     const LK_BASE = 'https://wtv.liga.nu/cgi-bin/WebObjects/nuLigaTENDE.woa/wa/clubRankinglistLK?federation=WTV&club=2015325';
 
+    // Begegnungen mit Spielbericht und gültigem Endergebnis — die Bilanz wird aus
+    // diesen Spielberichten gezählt (jedes Match genau einmal)
+    const reportMatches = allMatches.filter(m => m.reportUrl && /^\d+:\d+$/.test(m.result || ''));
+
     // Vereinsseite holen → alle Mannschafts-Kader (teamPortrait)
     const clubHtml = await fetchURL(CLUB_TEAMS_URL).catch(() => '');
     const rosters = parseClubRosters(clubHtml);
 
-    const [lkHerren, lkDamen, ...rosterHtml] = await Promise.all([
+    // LK-Listen, Kader und Spielberichte in einem Schwung laden
+    const results = await Promise.all([
       fetchURL(LK_BASE + '&gender=1').catch(() => ''),
       fetchURL(LK_BASE + '&gender=0').catch(() => ''),
-      ...rosters.map(r => fetchURL(r.url).catch(() => null))
+      ...rosters.map(r => fetchURL(r.url).catch(() => null)),
+      ...reportMatches.map(m => fetchReport(m.reportUrl, true).catch(() => null))
     ]);
+    const lkHerren   = results[0];
+    const lkDamen    = results[1];
+    const rosterHtml = results.slice(2, 2 + rosters.length);
+    const reportHtml = results.slice(2 + rosters.length);
 
     // Aktueller LK + Geschlecht aus der LK-Vereinsübersicht (clubRankinglistLK): Name → {gender, lk}
     const lkInfo = {};
@@ -3430,7 +3451,7 @@ async function loadStatistik() {
     addLK(lkHerren, 'm');
     addLK(lkDamen,  'w');
 
-    // Spieler aus allen gemeldeten Kadern aufbauen (mit Jahrgang, LK, Bilanz)
+    // Spieler aus allen gemeldeten Kadern aufbauen (Name, Jahrgang, LK, Geschlecht – ohne Bilanz)
     const playerMap = {};
     for (let i = 0; i < rosters.length; i++) {
       if (rosterHtml[i]) parseTeamRoster(rosterHtml[i], rosters[i].label, playerMap);
@@ -3445,8 +3466,13 @@ async function loadStatistik() {
       p.realGender = (info && info.gender) || teamG || _guessGenderByName(p.name) || '';
       p.gender     = p.realGender; // Statistik-Filter (Herren/Damen); LK-lose nach Geschlecht einsortiert
       delete p.teamGenders;
-      delete p.balanceGroups;
     });
+
+    // Bilanz aus den Spielberichten zählen — jedes Match genau einmal, daher keine
+    // Doppelzählung mehr bei Spielern in mehreren Mannschaften/Wettbewerben
+    for (let i = 0; i < reportMatches.length; i++) {
+      if (reportHtml[i]) parseReportStats(reportHtml[i], reportMatches[i], playerMap);
+    }
 
     _statistikData = Object.values(playerMap);
 
@@ -3480,10 +3506,6 @@ function parseTeamRoster(html, label, playerMap) {
   if (!table) return;
   const teamGender = /junioren\b|herren/i.test(label) ? 'm'
                    : /juniorinnen|damen/i.test(label) ? 'w' : '';
-  // Altersgruppe ohne Team-Nummer: "Herren 40 4er 1" → "Herren 40 4er"
-  // liga.nu zeigt für Teams derselben Gruppe (1, 2, …) dieselbe kombinierte
-  // Spielerbilanz auf jeder Mannschaftsseite — daher pro Gruppe nur einmal zählen.
-  const groupKey = label.replace(/\s+\d+$/, '').trim();
   [...table.rows].forEach(row => {
     if (row.querySelectorAll('th').length) return;
     const cells = [...row.cells];
@@ -3496,23 +3518,16 @@ function parseTeamRoster(html, label, playerMap) {
     if (!name.includes(',')) return;
     const lkCell = cells.find(c => /^LK[\d.,]+$/.test(c.textContent.trim()));
     const lk = lkCell ? lkCell.textContent.trim().replace(/^LK/, '').replace(',', '.') : '–';
-    const einzel = (cells[cells.length - 3] || { textContent: '-' }).textContent.trim();
-    const doppel = (cells[cells.length - 2] || { textContent: '-' }).textContent.trim();
     const key = _normName(name);
     let p = playerMap[key];
-    if (!p) p = playerMap[key] = { name, year, lk: '–', gender: '', realGender: '', teamGenders: new Set(), balanceGroups: new Set(), einzelWins: 0, einzelLosses: 0, doppelWins: 0, doppelLosses: 0 };
+    // Nur Stammdaten (Name, Jahrgang, LK, Geschlecht). Die Bilanz wird NICHT aus den
+    // teamPortrait-Spalten gelesen — dort steht eine je Altersklasse aggregierte
+    // Bilanz, die auf mehreren Mannschaftsseiten wiederholt wird (Doppelzählung).
+    // Siege/Niederlagen kommen aus den Spielberichten (parseReportStats).
+    if (!p) p = playerMap[key] = { name, year, lk: '–', gender: '', realGender: '', teamGenders: new Set(), einzelWins: 0, einzelLosses: 0, doppelWins: 0, doppelLosses: 0 };
     if (year && !p.year) p.year = year;
     if (lk !== '–') p.lk = lk;
     if (teamGender) p.teamGenders.add(teamGender);
-    // Bilanz nur einmal pro Altersgruppe übernehmen (sonst Doppelzählung bei
-    // gemeinsamem Kader von „… 1" und „… 2")
-    if (!p.balanceGroups) p.balanceGroups = new Set();
-    if (!p.balanceGroups.has(groupKey)) {
-      p.balanceGroups.add(groupKey);
-      const add = (val, type) => { const mm = val.match(/^(\d+):(\d+)$/); if (mm) { p[type + 'Wins'] += +mm[1]; p[type + 'Losses'] += +mm[2]; } };
-      add(einzel, 'einzel');
-      add(doppel, 'doppel');
-    }
   });
 }
 
