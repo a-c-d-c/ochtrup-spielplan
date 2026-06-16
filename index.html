@@ -3371,7 +3371,7 @@ if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
 /* ── Statistik ─────────────────────────────────────────────── */
 let _statistikData = null;
 let _statistikSort = { col: 'gesamt', dir: -1 };
-let _statistikGenders = new Set(['m', 'w', 'x']);
+let _statistikGenders = new Set(['m', 'w']);
 
 /* Vornamen-Geschlecht (Fallback, wenn weder LK-Liste noch Mannschaftsname das Geschlecht liefern) */
 const NAME_GENDER = {};
@@ -3423,9 +3423,8 @@ async function loadStatistik() {
     Object.values(playerMap).forEach(p => {
       const key   = _normName(p.name);
       const teamG = p.teamGenders.size === 1 ? [...p.teamGenders][0] : '';
-      p.realGender = genderMap[key] || teamG || _guessGenderByName(p.name) || '';  // für Spielberechtigung
-
-      p.gender     = (p.lk !== '–') ? (genderMap[key] || teamG || 'x') : 'x'; // Statistik-Filter (Herren/Damen/Ohne LK)
+      p.realGender = genderMap[key] || teamG || _guessGenderByName(p.name) || '';
+      p.gender     = p.realGender; // Statistik-Filter (Herren/Damen); LK-lose nach Geschlecht einsortiert
       delete p.teamGenders;
     });
 
@@ -3616,7 +3615,7 @@ function _fmtLK(lk) {
 function renderStatistikTable(container) {
   const col = _statistikSort.col;
   const dir = _statistikSort.dir;
-  const data = _statistikData.filter(p => _statistikGenders.has(p.gender)).sort((a, b) => {
+  const data = _statistikData.filter(p => !p.gender || _statistikGenders.has(p.gender)).sort((a, b) => {
     let cmp;
     if (col === 'name') {
       cmp = a.name.localeCompare(b.name, 'de');
@@ -3646,7 +3645,7 @@ function renderStatistikTable(container) {
 
   const genderBtn = (g, label) => `<button class="btn btn-filter${_statistikGenders.has(g) ? ' on' : ''}" onclick="toggleStatistikGender('${g}')">${label}</button>`;
 
-  let html = `<div class="stat-gender-row">${genderBtn('m', 'Herren')}${genderBtn('w', 'Damen')}${genderBtn('x', 'Ohne LK')}</div>`;
+  let html = `<div class="stat-gender-row">${genderBtn('m', 'Herren')}${genderBtn('w', 'Damen')}</div>`;
 
   if (!data.length) {
     html += '<div class="status-msg">' + (_statistikGenders.size ? 'Keine Spieler in dieser Liste.' : 'Bitte Herren und/oder Damen auswählen.') + '</div>';
