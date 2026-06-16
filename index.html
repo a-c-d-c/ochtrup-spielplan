@@ -726,6 +726,12 @@
   #statistik-container { overflow-x: auto; -webkit-overflow-scrolling: touch; margin-top: 4px; }
   .stat-gender-row { display: flex; gap: 6px; margin-bottom: 12px; }
   .stat-gender-row .btn { flex: 1; min-width: 0; text-align: center; padding: 9px 6px; font-size: 0.78rem; }
+  .stat-name-cell { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .stat-name { min-width: 0; }
+  .gender-badge { flex-shrink: 0; width: 17px; height: 17px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 0.62rem; font-weight: 700; color: #fff; line-height: 1; }
+  .gb-m { background: #2b6fd6; }
+  .gb-w { background: #e84d8a; }
+  .gb-x { background: #555a7a; }
   .stat-table { width: 100%; border-collapse: collapse; font-size: 0.78rem; }
   .stat-table th {
     padding: 7px 6px; text-align: left;
@@ -3654,8 +3660,11 @@ function renderStatistikTable(container) {
 
   for (const p of data) {
     const gw = p.einzelWins + p.doppelWins, gl = p.einzelLosses + p.doppelLosses;
+    const ci = p.name.indexOf(',');
+    const nameHtml = esc(ci >= 0 ? p.name.slice(0, ci) : p.name) + '<br><span style="font-size:0.72rem;opacity:0.75">' + esc(ci >= 0 ? p.name.slice(ci + 1).trim() : '') + '</span>';
+    const badge = '<span class="gender-badge gb-' + (p.realGender === 'm' ? 'm">m' : p.realGender === 'w' ? 'w">w' : 'x">?') + '</span>';
     html += `<tr>
-      <td>${(ci => esc(ci >= 0 ? p.name.slice(0, ci) : p.name) + '<br><span style="font-size:0.72rem;opacity:0.75">' + esc(ci >= 0 ? p.name.slice(ci + 1).trim() : '') + '</span>')(p.name.indexOf(','))}</td>
+      <td><div class="stat-name-cell"><div class="stat-name">${nameHtml}</div>${badge}</div></td>
       <td>${esc(p.year || '–')}</td>
       <td>${esc(_fmtLK(p.lk))}</td>
       <td>${_fmtStat(gw, gl)}</td>
