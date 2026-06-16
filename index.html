@@ -3375,9 +3375,11 @@ const NAME_GENDER = {};
   .split(/\s+/).forEach(n => NAME_GENDER[n] = 'w');
 
 function _guessGenderByName(fullName) {
-  const after = (String(fullName).split(',')[1] || '').trim();
-  const first = (after.split(/\s+/)[0] || '').toLowerCase().replace(/[^a-zäöüß]/g, '');
-  return NAME_GENDER[first] || '';
+  const after = (String(fullName).split(',')[1] || '').toLowerCase();
+  // Doppel-/Mehrfachnamen zerlegen (z. B. "Mia-Sophie", "Anna Lena") und ersten erkannten Teil nehmen
+  const parts = after.split(/[\s.-]+/).map(s => s.replace(/[^a-zäöüß]/g, '')).filter(Boolean);
+  for (const part of parts) if (NAME_GENDER[part]) return NAME_GENDER[part];
+  return '';
 }
 
 async function loadStatistik() {
