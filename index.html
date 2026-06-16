@@ -927,7 +927,7 @@
   .jahrgang-player-list li.played .jp-name { font-weight: 800; color: #fff; }
   .jp-name { font-weight: 600; }
   .jp-meta { opacity: 0.7; font-size: 0.8rem; white-space: nowrap; }
-  .jahrgang-modal-close { width: 100%; margin-top: 16px; padding: 13px; background: rgba(144,149,176,0.12); border: 1px solid rgba(144,149,176,0.5); border-radius: 22px; color: #c8cade; font-family: inherit; font-size: 0.95rem; font-weight: 600; cursor: pointer; }
+  .jahrgang-modal-close { width: 100%; margin-bottom: 16px; padding: 13px; background: rgba(144,149,176,0.12); border: 1px solid rgba(144,149,176,0.5); border-radius: 22px; color: #c8cade; font-family: inherit; font-size: 0.95rem; font-weight: 600; cursor: pointer; }
 
 </style>
 <style id="theme-override-css"></style>
@@ -1117,10 +1117,10 @@
 
 <div id="jahrgang-modal" onclick="if(event.target===this)closeJahrgang()">
   <div class="jahrgang-modal-card">
+    <button class="jahrgang-modal-close" onclick="closeJahrgang()">Schließen</button>
     <div class="jahrgang-modal-title" id="jahrgang-modal-title"></div>
     <div class="jahrgang-modal-sub" id="jahrgang-modal-sub"></div>
     <div id="jahrgang-modal-body"></div>
-    <button class="jahrgang-modal-close" onclick="closeJahrgang()">Schließen</button>
   </div>
 </div>
 
@@ -2926,9 +2926,10 @@ async function showJahrgang(klasse, primaryStr, parenStr, gender) {
   const hasPlayed = p => (p.einzelWins + p.einzelLosses + p.doppelWins + p.doppelLosses) > 0;
   // Reihenfolge: 0 = gespielt (fett), 1 = spielberechtigt ohne Bilanz, 2 = eine Klasse tiefer (Klammern)
   const rank = p => parenSet.has(p.year) ? 2 : (hasPlayed(p) ? 0 : 1);
+  const lkVal = p => parseFloat(p.lk) || 99;
   const players = _statistikData
     .filter(p => p.year && wanted.has(p.year) && (!gender || p.gender === gender))
-    .sort((a, b) => (rank(a) - rank(b)) || a.year.localeCompare(b.year) || a.name.localeCompare(b.name, 'de'));
+    .sort((a, b) => (rank(a) - rank(b)) || (lkVal(a) - lkVal(b)) || a.name.localeCompare(b.name, 'de'));
 
   if (!players.length) {
     body.innerHTML = '<div class="status-msg">Keine Spieler dieser Jahrgänge gefunden.</div>';
