@@ -1,0 +1,8 @@
+{
+  "name": "Spielplan 26",
+  "icon": "🎾",
+  "kategorie": "Apps",
+  "beschreibung": "Spielplan des TC 1928 Ochtrup — statische PWA auf GitHub Pages",
+  "ausfuehren": { "art": "app", "ziel": "Spielplan 26.app" },
+  "editieren": { "art": "claude" }
+}
