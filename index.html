@@ -133,6 +133,26 @@
     letter-spacing: 0.05em;
     text-transform: uppercase;
   }
+  /* ── Saison-Umschalter (Sommer / Winter) ── */
+  .season-row { display: flex; justify-content: center; gap: 8px; margin-top: 10px; }
+  .season-row:empty { display: none; }
+  .btn-season {
+    background: transparent;
+    border: 1px solid #2e3150;
+    border-radius: 999px;
+    color: #7a7f96;
+    font-family: inherit;
+    font-size: 0.68rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    padding: 7px 15px;
+    cursor: pointer;
+    transition: all 0.15s;
+    white-space: nowrap;
+    user-select: none;
+  }
+  .btn-season.on { color: #fff; font-weight: 700; border-color: #9095b0; background: rgba(144,149,176,0.10); }
 
   /* ── Next match box ── */
   .next-match-box {
@@ -968,7 +988,8 @@
     <img src="logo.png" class="header-logo" alt="TC 1928 Ochtrup Logo" onerror="this.style.display='none'">
     <h1>TC 1928 Ochtrup</h1>
   </div>
-  <p>Spielplan · Münsterland · Sommer 2026</p>
+  <p id="header-sub">Spielplan · Münsterland</p>
+  <div class="season-row" id="season-row"></div>
 </div>
 
 <!-- Spenden-Banner -->
@@ -1138,16 +1159,31 @@
 /* ── Dynamische Mannschaftsliste ───────────────────────────── */
 const CLUB_NAME      = 'Ochtrup';
 const CLUB_TEAMS_URL = 'https://wtv.liga.nu/cgi-bin/WebObjects/nuLigaTENDE.woa/wa/clubTeams?club=26831';
+const CLUB_MEETINGS_URL = 'https://wtv.liga.nu/cgi-bin/WebObjects/nuLigaTENDE.woa/wa/clubMeetings?club=26831';
 const CORS_WORKER    = 'https://tennis-cors-proxy.dm8fnwtkwv.workers.dev/?url=';
-const LS_STATE       = 'spielplan-state';
-const LS_AUSWAHL     = 'spielplan-meine-auswahl';
-const LS_LEAGUES     = 'spielplan-leagues-v6';
+const LS_SEASON      = 'spielplan-saison';
+const LS_STATE_BASE  = 'spielplan-state';
+const LS_AUSWAHL_BASE= 'spielplan-meine-auswahl';
+const LS_HTML_BASE   = 'spielplan-html-v2';
+const LS_LEAGUES     = 'spielplan-leagues-v7';
 const LS_THEME       = 'spielplan-theme';
 const LS_OVERLAY_DARK  = 'spielplan-overlay-dark';
 const LS_OVERLAY_LIGHT = 'spielplan-overlay-light';
 const LS_STARTS      = 'spielplan-starts';
-const LS_HTML_CACHE  = 'spielplan-html-v1';
 const HTML_CACHE_TTL = 4 * 60 * 60 * 1000;
+
+/* Saison (liga.nu-„championship", z. B. „MS 2026" oder „MS Winter 26/27").
+   Einstellungen, Favoriten und Spielplan-Cache hängen daran, weil beide Saisons
+   eigene Mannschaften haben — und weil liga.nu die Gruppen-Nummern je Saison neu
+   vergibt, dieselbe Nummer also in beiden Saisons eine andere Mannschaft meint.
+   Leer = Saison noch unbekannt (erster Start nach dem Update); dann gelten die
+   bisherigen Schlüssel ohne Saison-Zusatz, applySeason() übernimmt sie einmalig. */
+let SEASON_KEY        = localStorage.getItem(LS_SEASON) || '';
+const _seasonWasUnset = !SEASON_KEY;
+function _seasonSuffix() { return SEASON_KEY ? '::' + SEASON_KEY : ''; }
+let LS_STATE      = LS_STATE_BASE   + _seasonSuffix();
+let LS_AUSWAHL    = LS_AUSWAHL_BASE + _seasonSuffix();
+let LS_HTML_CACHE = LS_HTML_BASE    + _seasonSuffix() + ':';
 
 const LIGHT_THEME_CSS = `
   html, body { background: #f0f2f8; }
@@ -1155,6 +1191,8 @@ const LIGHT_THEME_CSS = `
   #controls-slider { background: #f0f2f8; }
   .header h1 { color: #1a1d2e; }
   .header p { color: #5a5f7a; }
+  .btn-season { border-color: rgba(90,100,160,0.35); color: #5a5f7a; }
+  .btn-season.on { color: #1a1d2e; border-color: rgba(90,100,160,0.75); background: #c8cde4; }
   .nm-label { color: #fff; border-color: rgba(255,255,255,0.5) !important; }
   .nm-days { color: #fff; }
   .nm-unit { color: #fff; }
@@ -1230,6 +1268,8 @@ const ROLAND_GARROS_CSS = `
   body { color: #ffffff; }
   .header h1 { color: #ffffff; }
   .header p { color: rgba(255,255,255,0.7); }
+  .btn-season { border-color: rgba(255,255,255,0.4); color: rgba(255,255,255,0.7); }
+  .btn-season.on { color: #ffffff; border-color: #ffffff; background: rgba(255,255,255,0.15); }
   .next-match-box { background: #143D26; border-color: #ffffff; }
   .nm-label { color: rgba(255,255,255,0.75) !important; border-color: rgba(255,255,255,0.4) !important; }
   .nm-league { background: #143D26 !important; color: #ffffff !important; border-color: rgba(255,255,255,0.5) !important; }
@@ -1599,7 +1639,39 @@ function teamColor(label, catIdx) {
   return PALETTE_JUGEND[catIdx % PALETTE_JUGEND.length];
 }
 
-let LEAGUES = [];
+let LEAGUES     = [];   // Mannschaften der gewählten Saison
+let ALL_LEAGUES = [];   // alle Mannschaften, über alle Saisons der Vereinsseite
+let SEASONS     = [];   // Saison-Schlüssel in der Reihenfolge der Vereinsseite
+
+/* „MS+Winter+26%2F27" → „MS Winter 26/27" */
+function _decodeChampionship(raw) {
+  try { return decodeURIComponent(raw.replace(/\+/g, ' ')); }
+  catch(e) { return raw.replace(/\+/g, ' '); }
+}
+
+/* Saison-Schlüssel → Beschriftung für den Umschalter */
+function seasonLabel(key) {
+  const w = key.match(/Winter\s+(\d{2})\s*\/\s*(\d{2})/i);
+  if (w) return 'Winter 20' + w[1] + '/20' + w[2];
+  const y = key.match(/(\d{4})/);
+  if (y) return 'Sommer ' + y[1];
+  return key;
+}
+
+/* Saison des nächsten anstehenden Spiels. liga.nu listet auf der Begegnungs-Seite die
+   kommenden Spiele nach Datum, jede Zeile mit ihrer Saison — die erste ist die laufende.
+   Wird nur für die Vorauswahl beim allerersten Start gebraucht. */
+let _detectedSeason = '';
+async function detectCurrentSeason() {
+  try {
+    const decoded = (await fetchURL(CLUB_MEETINGS_URL)).replace(/&amp;/g, '&');
+    /* Erst ab der Ergebnistabelle suchen — davor steht ein Auswahlformular mit allen Saisons */
+    const start = decoded.indexOf('result-set');
+    if (start < 0) return '';
+    const m = decoded.slice(start).match(/[?&]championship=([^&"]*)/);
+    return m ? _decodeChampionship(m[1]) : '';
+  } catch(e) { return ''; }
+}
 
 function parseClubTeams(html) {
   const decoded = html.replace(/&amp;/g, '&');
@@ -1612,13 +1684,14 @@ function parseClubTeams(html) {
     const label    = m[1].trim().replace(/grüner ball/gi, 'Gr. Ball');
     const relHref  = m[2];
     const group    = m[3];
+    const season   = _decodeChampionship((relHref.match(/[?&]championship=([^&"]*)/) || ['',''])[1]);
     const leagueLabel = m[4].trim().replace(/\s+Gr\.\s*\d+.*$/i, '').trim();
     const liPart      = leagueLabel.match(/((?:Kreis|Bezirks|Münsterland|Verbands|Landes|Westfalen|Generali)\S*.*)/i);
     const sublabel    = liPart ? liPart[1].trim() : leagueLabel;
-    if (seenGroups.has(group)) continue;
-    seenGroups.add(group);
+    if (seenGroups.has(season + '|' + group)) continue;
+    seenGroups.add(season + '|' + group);
     const url = relHref.startsWith('http') ? relHref : 'https://wtv.liga.nu' + relHref;
-    results.push({ team: 'g' + group, label, sublabel, leagueLabel, url, color: [128, 128, 128] });
+    results.push({ team: 'g' + group, season, label, sublabel, leagueLabel, url, color: [128, 128, 128] });
   }
   return results;
 }
@@ -1677,24 +1750,102 @@ function buildTeamButtons() {
 }
 
 async function initLeagues() {
-  try {
-    const cached = JSON.parse(localStorage.getItem(LS_LEAGUES) || 'null');
-    if (cached && cached.ts && Date.now() - cached.ts < 24 * 3600 * 1000 && cached.leagues.length) {
-      LEAGUES = cached.leagues;
-      applyLeagues();
-      return;
+  let cached = null;
+  try { cached = JSON.parse(localStorage.getItem(LS_LEAGUES) || 'null'); } catch(e) {}
+  if (cached && cached.ts && Date.now() - cached.ts < 24 * 3600 * 1000 && cached.leagues && cached.leagues.length) {
+    ALL_LEAGUES = cached.leagues;
+  } else {
+    try {
+      const html = await fetchURL(CLUB_TEAMS_URL);
+      ALL_LEAGUES = parseClubTeams(html);
+      if (ALL_LEAGUES.length) {
+        localStorage.setItem(LS_LEAGUES, JSON.stringify({ ts: Date.now(), leagues: ALL_LEAGUES }));
+      }
+    } catch(e) {
+      console.warn('Mannschaftsliste konnte nicht geladen werden:', e.message);
     }
-  } catch(e) {}
-  try {
-    const html = await fetchURL(CLUB_TEAMS_URL);
-    LEAGUES = parseClubTeams(html);
-    if (LEAGUES.length) {
-      localStorage.setItem(LS_LEAGUES, JSON.stringify({ ts: Date.now(), leagues: LEAGUES }));
-    }
-  } catch(e) {
-    console.warn('Mannschaftsliste konnte nicht geladen werden:', e.message);
   }
+  if (!SEASON_KEY && ALL_LEAGUES.length) _detectedSeason = await detectCurrentSeason();
+  applySeason();
   applyLeagues();
+}
+
+/* Gewählte Saison festlegen und LEAGUES darauf einschränken.
+   Die Vereinsseite listet in der Übergangszeit Sommer- und Winterrunde zusammen —
+   ohne diese Trennung mischen sich die Mannschaften beider Saisons. */
+function applySeason() {
+  SEASONS = [];
+  ALL_LEAGUES.forEach(l => { if (l.season && SEASONS.indexOf(l.season) === -1) SEASONS.push(l.season); });
+
+  if (SEASONS.length && SEASONS.indexOf(SEASON_KEY) === -1) {
+    /* Die bisherigen (saisonlosen) Einstellungen stammen aus der Zeit vor der Umschaltung
+       und gehören zur ältesten gelisteten Saison — dort bleiben sie erhalten, auch wenn
+       die App gleich mit der laufenden Saison startet. */
+    if (_seasonWasUnset) migrateOldSettings(SEASONS[0]);
+    setSeasonKey(SEASONS.indexOf(_detectedSeason) !== -1 ? _detectedSeason : SEASONS[0]);
+    /* Filter, Mannschaftsauswahl und Favoriten hängen an der Saison — nach dem
+       Umstellen der Schlüssel neu einlesen, sonst gälte hier der Stand der anderen Saison. */
+    const st  = loadState();
+    showPast   = st.showPast;
+    showFuture = st.showFuture;
+    showHome   = st.showHome;
+    showAway   = st.showAway;
+    showTeams  = st.showTeams;
+    selectMode = st.selectMode;
+    meineAuswahlActive = (selectMode === 'meine');
+  }
+  LEAGUES = SEASON_KEY ? ALL_LEAGUES.filter(l => l.season === SEASON_KEY) : ALL_LEAGUES.slice();
+  buildSeasonButtons();
+}
+
+/* Aktive Saison setzen — dabei hängen Einstellungen, Favoriten und Spielplan-Cache um.
+   Beim allerersten Mal werden die bisherigen (saisonlosen) Einstellungen übernommen. */
+function migrateOldSettings(key) {
+  const suffix = '::' + key;
+  [LS_STATE_BASE, LS_AUSWAHL_BASE].forEach(base => {
+    const alt = localStorage.getItem(base);
+    if (alt !== null && localStorage.getItem(base + suffix) === null) localStorage.setItem(base + suffix, alt);
+  });
+}
+
+function setSeasonKey(key) {
+  SEASON_KEY = key;
+  localStorage.setItem(LS_SEASON, key);
+  const suffix = _seasonSuffix();
+  LS_STATE      = LS_STATE_BASE   + suffix;
+  LS_AUSWAHL    = LS_AUSWAHL_BASE + suffix;
+  LS_HTML_CACHE = LS_HTML_BASE    + suffix + ':';
+}
+
+function buildSeasonButtons() {
+  const row = document.getElementById('season-row');
+  const sub = document.getElementById('header-sub');
+  if (!row) return;
+  row.innerHTML = '';
+  /* Nur eine Saison gemeldet → kein Umschalter nötig, Saison steht in der Kopfzeile */
+  if (SEASONS.length < 2) {
+    if (sub) sub.textContent = 'Spielplan · Münsterland' + (SEASON_KEY ? ' · ' + seasonLabel(SEASON_KEY) : '');
+    updateHeaderH();
+    return;
+  }
+  if (sub) sub.textContent = 'Spielplan · Münsterland';
+  SEASONS.forEach(key => {
+    const btn = document.createElement('button');
+    btn.className   = 'btn-season' + (key === SEASON_KEY ? ' on' : '');
+    btn.textContent = seasonLabel(key);
+    btn.addEventListener('click', () => switchSeason(key));
+    row.appendChild(btn);
+  });
+  updateHeaderH();
+}
+
+/* Saisonwechsel lädt die Seite neu: Spielplan, Favoriten, Statistiken und Cache
+   hängen alle an der Saison — ein Neustart ist der sicherste Weg, nichts zu vermischen. */
+function switchSeason(key) {
+  if (key === SEASON_KEY) return;
+  saveState();
+  localStorage.setItem(LS_SEASON, key);
+  location.reload();
 }
 
 function sortLeagues(leagues) {
@@ -1871,7 +2022,7 @@ function setCachedHtml(key, html) {
   try { localStorage.setItem(LS_HTML_CACHE + key, JSON.stringify({ ts: Date.now(), html })); } catch {}
 }
 function clearHtmlCache() {
-  Object.keys(localStorage).filter(k => k.startsWith(LS_HTML_CACHE)).forEach(k => localStorage.removeItem(k));
+  Object.keys(localStorage).filter(k => k.startsWith(LS_HTML_BASE)).forEach(k => localStorage.removeItem(k));
 }
 
 /* ── Fetch ─────────────────────────────────────────────────── */
@@ -3427,7 +3578,8 @@ async function loadStatistik() {
 
     // Vereinsseite holen → alle Mannschafts-Kader (teamPortrait)
     const clubHtml = await fetchURL(CLUB_TEAMS_URL).catch(() => '');
-    const rosters = parseClubRosters(clubHtml);
+    /* Nur die Kader der gewählten Saison — sonst stünden Spieler beider Runden in der Liste */
+    const rosters = parseClubRosters(clubHtml).filter(r => !SEASON_KEY || r.season === SEASON_KEY);
 
     // Phase 1: LK-Listen + Kader laden. Bestimmt, WER in der Statistik steht — bewusst
     // getrennt von den Spielberichten, damit die Spielerliste vollständig bleibt, auch
@@ -3475,6 +3627,13 @@ async function loadStatistik() {
 
     _statistikData = Object.values(playerMap);
 
+    if (!_statistikData.length) {
+      /* liga.nu veröffentlicht die gemeldeten Spieler erst nach Abschluss der Meldephase */
+      container.innerHTML = '<div class="status-msg">Für diese Saison hat liga.nu noch keine Mannschaftsmeldungen veröffentlicht.</div>';
+      container.dataset.loaded = '';
+      return;
+    }
+
     renderStatistikTable(container);
   } catch(e) {
     container.innerHTML = '<div class="status-msg">Statistik konnte nicht geladen werden.</div>';
@@ -3493,7 +3652,8 @@ function parseClubRosters(html) {
     const url = m[1].startsWith('http') ? m[1] : 'https://wtv.liga.nu' + m[1];
     if (seen.has(url)) continue;
     seen.add(url);
-    out.push({ url, label: m[2].trim() });
+    const season = _decodeChampionship((m[1].match(/[?&]championship=([^&"]*)/) || ['',''])[1]);
+    out.push({ url, season, label: m[2].trim() });
   }
   return out;
 }
