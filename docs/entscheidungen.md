@@ -2,6 +2,29 @@
 
 > Warum die Dinge so sind, wie sie sind. Neue Entscheidung? Oben anfügen, mit Datum.
 
+## 2026-09-08 — Service Worker: `no-cache` ja, Caches löschen nein
+
+Löst den offenen Punkt vom 17.08.2026 (weiter unten). Ansgars Entscheidung.
+
+GitHub Pages liefert die Seite mit `cache-control: max-age=600` aus — der Browser darf
+sie also **zehn Minuten** aus eigenem Speicher zeigen, ohne nachzufragen. Genau das ist
+der Grund, warum eine Änderung auf dem Handy verzögert ankam. `sw.js` (jetzt `// v3`)
+setzt deshalb für **eigene** Dateien `cache: 'no-cache'`; Anfragen an fremde Server
+(liga.nu über die CORS-Proxys) bleiben unangetastet.
+
+**Das Cache-Löschen aus der alten v2-Fassung wurde bewusst nicht übernommen** — es
+bringt nichts (siehe unten) und wäre nur ein zusätzliches Risiko.
+
+**Nebenbefund: Der Offline-Rückfall ist wirkungslos.** Weder die alte noch die neue
+Fassung legt jemals etwas in den Cache — kein `caches.put`, kein `caches.add`. Das
+`caches.match()` im Fehlerfall greift also ins Leere, und ohne Netz zeigt die App
+nichts. Das ist verkraftbar, weil sie ihre Daten ohnehin live von liga.nu holt, aber
+es erklärt, warum bei einem Proxy-Ausfall einfach eine leere Seite dasteht.
+
+Die Konstruktion des umgeleiteten Requests steht in einem `try`/`catch`: Scheitert sie
+in irgendeinem Browser, geht die ursprüngliche Anfrage durch, statt dass die Seite tot
+ist.
+
 ## 2026-09-08 — Saison-Umschalter statt einer festen Saison
 
 liga.nu listet auf der Vereinsseite in der Übergangszeit **beide Runden zusammen**
@@ -25,7 +48,7 @@ Ohne das sähe ein Vereinsmitglied im September die leere, durchgespielte Sommer
 **Die Spielberechtigungen im Jugendbereich bleiben saisonübergreifend** — sie gelten
 weiter, unabhängig von der gewählten Runde (Ansgars Vorgabe).
 
-## 2026-08-17 — OFFEN: zwei Service-Worker-Fassungen
+## 2026-08-17 — ERLEDIGT (08.09.2026): zwei Service-Worker-Fassungen
 
 Beim Umzug gefunden. Der lokale Ordner und die ausgelieferte Fassung unterscheiden
 sich in `sw.js` um 18 Zeilen — **in allen anderen Dateien um null.**
