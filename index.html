@@ -163,12 +163,11 @@
     border: 1px solid #252840;
     border-radius: 12px;
     padding: 14px 16px;
-    margin-bottom: 14px;
+    margin-bottom: 10px;
     display: none;
     flex-direction: column;
     align-items: flex-start;
     gap: 0;
-    min-height: calc(4.4rem + 4.2em + 75px);
     position: relative;
     isolation: isolate;
   }
@@ -185,19 +184,6 @@
     flex-direction: column;
     gap: 3px;
   }
-  .nm-label {
-    align-self: center;
-    padding: 6px 18px;
-    border-radius: 20px;
-    border: 1px solid #2e3150;
-    background: transparent;
-    color: #9095b0;
-    font-size: 0.82rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    margin-bottom: 10px;
-  }
   .nm-teams {
     display: flex;
     align-items: center;
@@ -207,7 +193,7 @@
     line-height: 1.4;
     width: 100%;
   }
-  .next-match-box .nm-teams { min-height: 4.2em; }
+  .next-match-box.no-match .nm-teams { margin-top: 0; padding: 18px 0; justify-content: center; }
   .nm-match-teams {
     flex: 1;
     min-width: 0;
@@ -989,7 +975,6 @@
 
 <!-- Nächstes Spiel -->
 <div id="next-match-box" class="next-match-box">
-  <div class="nm-label">Nächstes Spiel</div>
   <div class="nm-top-row" id="nm-top-row">
     <div class="nm-left-col">
       <div class="nm-date"   id="nm-date"></div>
@@ -1142,11 +1127,9 @@ const LIGHT_THEME_CSS = `
   .header p { color: #5a5f7a; }
   .btn-season { border-color: rgba(90,100,160,0.35); color: #5a5f7a; }
   .btn-season.on { color: #1a1d2e; border-color: rgba(90,100,160,0.75); background: #c8cde4; }
-  .nm-label { color: #fff; border-color: rgba(255,255,255,0.5) !important; }
   .nm-days { color: #fff; }
   .nm-unit { color: #fff; }
   .next-match-box.no-match { background: #c8cde4; border-color: #5060a0; color: #1a1d2e; }
-  .next-match-box.no-match .nm-label { color: #1a1d2e; font-weight: 700; }
   .card::after { background: rgba(240,242,248,var(--overlay-light)); }
   .next-match-box::after { background: rgba(240,242,248,var(--overlay-light)); }
   .nm-league { border-color: rgba(255,255,255,0.5) !important; }
@@ -1215,13 +1198,11 @@ const ROLAND_GARROS_CSS = `
   .btn-season { border-color: rgba(255,255,255,0.4); color: rgba(255,255,255,0.7); }
   .btn-season.on { color: #ffffff; border-color: #ffffff; background: rgba(255,255,255,0.15); }
   .next-match-box { background: #143D26; border-color: #ffffff; }
-  .nm-label { color: rgba(255,255,255,0.75) !important; border-color: rgba(255,255,255,0.4) !important; }
   .nm-league { background: #143D26 !important; color: #ffffff !important; border-color: rgba(255,255,255,0.5) !important; }
   .nm-date { color: rgba(255,255,255,0.8) !important; }
   .nm-days { color: #ffffff !important; }
   .nm-unit { color: rgba(255,255,255,0.7) !important; }
   .next-match-box.no-match { background: #143D26; border-color: #ffffff; color: #ffffff; }
-  .next-match-box.no-match .nm-label { color: #ffffff !important; font-weight: 700; }
   .card, .next-match-box { background: #143D26 !important; border-color: rgba(255,255,255,0.6) !important; }
   .card.home-game, #next-match-box.home-game { border-color: rgba(255,255,255,0.6) !important; border-width: 2px; }
   .btn { color: rgba(255,255,255,0.7); border-color: rgba(255,255,255,0.5); background: #143D26; }
@@ -2259,21 +2240,9 @@ async function loadAllData(forceRefresh = false) {
     mc.style.opacity = '0';
     mc.style.pointerEvents = 'none';
     document.getElementById('controls-slider').style.pointerEvents = 'none';
-    nmBox.classList.add('no-match');
     nmBox.style.transition = '';
-    nmBox.style.display = 'flex';
     nmBox.style.opacity = '1';
-    document.getElementById('nm-league').textContent = '';
-    document.getElementById('nm-league').className   = 'nm-league';
-    document.getElementById('nm-date').innerHTML     = '';
-    document.getElementById('nm-days').textContent   = '';
-    delete document.getElementById('nm-days').dataset.matchtime;
-    document.getElementById('nm-unit').textContent   = '';
-    const nmTeams = document.getElementById('nm-teams');
-    nmTeams.style.flexDirection  = 'column';
-    nmTeams.style.justifyContent = 'center';
-    nmTeams.style.marginTop      = '-3rem';
-    nmTeams.innerHTML = '<div class="loading-row" style="justify-content:center"><div class="spinner"></div>Spieldaten werden geladen …</div>';
+    showNmMessage('<div class="loading-row" style="justify-content:center"><div class="spinner"></div>Spieldaten werden geladen …</div>');
   }
 
   const hadCache = allMatches.length > 0;
@@ -2412,8 +2381,24 @@ async function retryTeam(league) {
 }
 
 /* ── Nächstes Spiel ────────────────────────────────────────── */
-let _homeBlinkTimer = null;
 let _lastDateStr = new Date().toDateString();
+
+/* Nächstes-Spiel-Box als reine Hinweiskarte anzeigen (kein Spiel / lädt) */
+function showNmMessage(html) {
+  const box = document.getElementById('next-match-box');
+  document.getElementById('nm-top-row').style.display = 'none';
+  document.getElementById('nm-date').innerHTML = '';
+  const nl = document.getElementById('nm-league');
+  nl.textContent = ''; nl.className = 'nm-league';
+  const nd = document.getElementById('nm-days');
+  nd.textContent = ''; delete nd.dataset.matchtime;
+  document.getElementById('nm-unit').textContent = '';
+  document.getElementById('nm-teams').innerHTML = html;
+  box.classList.remove('home-game');
+  LEAGUES.forEach(l => box.classList.remove(l.team));
+  box.classList.add('no-match');
+  box.style.display = 'flex';
+}
 
 function renderNextMatch() {
   const today = new Date(); today.setHours(0, 0, 0, 0);
@@ -2423,19 +2408,7 @@ function renderNextMatch() {
   if (!showFuture) { box.style.display = 'none'; return; }
   const noTeams = LEAGUES.every(l => !showTeams[l.team]);
   if (noTeams) {
-    document.getElementById('nm-date').innerHTML     = '';
-    document.getElementById('nm-teams').innerHTML    = '<span style="font-size:1.05rem;text-align:center;width:100%;display:block">Keine Mannschaften ausgewählt</span>';
-    const nl = document.getElementById('nm-league');
-    nl.textContent = ''; nl.className = 'nm-league';
-    const nmDays0 = document.getElementById('nm-days');
-    nmDays0.textContent = ''; delete nmDays0.dataset.matchtime;
-    document.getElementById('nm-unit').textContent   = '';
-    const nmT = document.getElementById('nm-teams');
-    nmT.style.flexDirection = 'column'; nmT.style.justifyContent = 'center'; nmT.style.marginTop = '-3rem';
-    box.classList.remove('home-game');
-    LEAGUES.forEach(l => box.classList.remove(l.team));
-    box.classList.add('no-match');
-    box.style.display = 'flex';
+    showNmMessage('<span style="font-size:1.05rem;text-align:center;width:100%;display:block">Keine Mannschaften ausgewählt</span>');
     return;
   }
 
@@ -2444,41 +2417,18 @@ function renderNextMatch() {
     return d >= today && !isMatchOver(m) && showFuture && showTeams[m.team] && (m.isHome ? showHome : showAway);
   });
   if (!next) {
-    document.getElementById('nm-date').innerHTML  = '';
-    document.getElementById('nm-teams').innerHTML =
-      '<span style="font-size:1.05rem;text-align:center;width:100%;display:block">Bei dieser Auswahl gibt es keine aktuellen Spiele</span>';
-    const nl2 = document.getElementById('nm-league');
-    nl2.textContent = ''; nl2.className = 'nm-league';
-    const nmDays2 = document.getElementById('nm-days');
-    nmDays2.textContent = ''; delete nmDays2.dataset.matchtime;
-    document.getElementById('nm-unit').textContent = '';
-    const nmT2 = document.getElementById('nm-teams');
-    nmT2.style.flexDirection = 'column'; nmT2.style.justifyContent = 'center'; nmT2.style.marginTop = '-3rem';
-    box.classList.remove('home-game');
-    LEAGUES.forEach(l => box.classList.remove(l.team));
-    box.classList.add('no-match');
-    box.style.display = 'flex';
+    showNmMessage('<span style="font-size:1.05rem;text-align:center;width:100%;display:block">Bei dieser Auswahl gibt es keine aktuellen Spiele</span>');
     return;
   }
 
-  const nmTr = document.getElementById('nm-teams');
-  nmTr.style.flexDirection = ''; nmTr.style.justifyContent = ''; nmTr.style.marginTop = '';
+  document.getElementById('nm-top-row').style.display = '';
   box.classList.remove('no-match');
   LEAGUES.forEach(l => box.classList.remove(l.team));
   box.classList.add(next.team);
   box.classList.toggle('home-game', next.isHome);
-  clearTimeout(_homeBlinkTimer);
-  const homeAwaySpan = next.isHome
-    ? '<span id="nm-heimspiel" class="nm-heim blink">Heimspiel</span>'
-    : '<span>Auswärts</span>';
+  const homeAwaySpan = next.isHome ? '<span class="nm-heim">Heimspiel</span>' : '<span>Auswärts</span>';
   document.getElementById('nm-date').innerHTML =
     WEEKDAYS[next.date.getDay()] + ' ' + next.dateStr + ' · ' + next.timeStr + ' Uhr · ' + homeAwaySpan;
-  if (next.isHome) {
-    _homeBlinkTimer = setTimeout(function() {
-      const el = document.getElementById('nm-heimspiel');
-      if (el) el.classList.remove('blink');
-    }, 5000);
-  }
   document.getElementById('nm-teams').innerHTML = matchTeamsHtml(next) +
     `<button class="btn-tabelle" onclick="event.stopPropagation();showTable('${next.team}')">Tabelle</button>`;
   const nmLeague = document.getElementById('nm-league');
