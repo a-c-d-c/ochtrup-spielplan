@@ -1106,6 +1106,29 @@ const LS_OVERLAY_LIGHT = 'spielplan-overlay-light';
 const LS_STARTS      = 'spielplan-starts';
 const HTML_CACHE_TTL = 4 * 60 * 60 * 1000;
 
+/* Eingefrorene Saisons: Alle liga.nu-Seiten einer abgeschlossenen Saison liegen als
+   Kopie unter archiv/<ordner>/ (angelegt mit tools/einfrieren.py). Für die aktive
+   Saison liefert fetchURL() diese Kopien statt über die CORS-Proxys zu gehen, und die
+   Saison bleibt im Umschalter, auch wenn liga.nu sie nicht mehr listet.
+   Reihenfolge: älteste zuerst. */
+const ARCHIVE_DIRS = ['archiv/sommer-2026'];
+let _archives     = [];   // { season, dir, clubHtml, files }
+let _archiveFiles = {};   // liga.nu-URL → lokaler Pfad, nur für die aktive Saison
+
+async function loadArchives() {
+  _archives = [];
+  for (const dir of ARCHIVE_DIRS) {
+    try {
+      const idx      = await (await fetch(dir + '/index.json')).json();
+      const clubHtml = await (await fetch(dir + '/' + idx.verein)).text();
+      const files    = {};
+      Object.keys(idx.dateien).forEach(u => { files[u] = dir + '/' + idx.dateien[u]; });
+      _archives.push({ season: idx.saison, dir, clubHtml, files });
+    } catch(e) { console.warn('Archiv nicht ladbar:', dir, e.message); }
+  }
+}
+function archiveFor(season) { return _archives.find(a => a.season === season) || null; }
+
 /* Saison (liga.nu-„championship", z. B. „MS 2026" oder „MS Winter 26/27").
    Einstellungen, Favoriten und Spielplan-Cache hängen daran, weil beide Saisons
    eigene Mannschaften haben — und weil liga.nu die Gruppen-Nummern je Saison neu
@@ -1563,7 +1586,7 @@ function teamColor(label, catIdx) {
 }
 
 let LEAGUES     = [];   // Mannschaften der gewählten Saison
-let ALL_LEAGUES = [];   // alle Mannschaften, über alle Saisons der Vereinsseite
+let ALL_LEAGUES = [];   // alle Mannschaften: eingefrorene Saisons + alle Saisons der Vereinsseite
 let SEASONS     = [];   // Saison-Schlüssel in der Reihenfolge der Vereinsseite
 
 /* „MS+Winter+26%2F27" → „MS Winter 26/27" */
@@ -1671,6 +1694,7 @@ function buildTeamButtons() {
 }
 
 async function initLeagues() {
+  await loadArchives();
   let cached = null;
   try { cached = JSON.parse(localStorage.getItem(LS_LEAGUES) || 'null'); } catch(e) {}
   if (cached && cached.ts && Date.now() - cached.ts < 24 * 3600 * 1000 && cached.leagues && cached.leagues.length) {
@@ -1686,6 +1710,14 @@ async function initLeagues() {
       console.warn('Mannschaftsliste konnte nicht geladen werden:', e.message);
     }
   }
+  /* Eingefrorene Saisons vorn anfügen — sie sind älter als alles, was liga.nu noch
+     listet. Führt die Vereinsseite eine Saison selbst noch auf, gilt deren Liste. */
+  const archived = [];
+  _archives.forEach(a => {
+    if (ALL_LEAGUES.some(l => l.season === a.season)) return;
+    archived.push(...parseClubTeams(a.clubHtml).filter(l => l.season === a.season));
+  });
+  ALL_LEAGUES = [...archived, ...ALL_LEAGUES];
   if (!SEASON_KEY && ALL_LEAGUES.length) _detectedSeason = await detectCurrentSeason();
   applySeason();
   applyLeagues();
@@ -1716,6 +1748,7 @@ function applySeason() {
     meineAuswahlActive = (selectMode === 'meine');
   }
   LEAGUES = SEASON_KEY ? ALL_LEAGUES.filter(l => l.season === SEASON_KEY) : ALL_LEAGUES.slice();
+  _archiveFiles = (archiveFor(SEASON_KEY) || { files: {} }).files;
   buildSeasonButtons();
 }
 
@@ -1948,6 +1981,15 @@ function clearHtmlCache() {
 
 /* ── Fetch ─────────────────────────────────────────────────── */
 async function fetchURL(targetUrl) {
+  /* Eingefrorene Saison: lokale Kopie statt Proxy. Schlägt sie fehl, geht es wie gewohnt weiter. */
+  const local = _archiveFiles[targetUrl];
+  if (local) {
+    try {
+      const res = await fetch(local);
+      if (res.ok) return await res.text();
+    } catch {}
+  }
+
   const encoded = encodeURIComponent(targetUrl);
 
   function tryProxy(url, isJson, ctrl, timeoutMs) {
@@ -3416,8 +3458,9 @@ async function loadStatistik() {
   try {
     const LK_BASE = 'https://wtv.liga.nu/cgi-bin/WebObjects/nuLigaTENDE.woa/wa/clubRankinglistLK?federation=WTV&club=2015325';
 
-    // Vereinsseite holen → alle Mannschafts-Kader (teamPortrait)
-    const clubHtml = await fetchURL(CLUB_TEAMS_URL).catch(() => '');
+    // Vereinsseite holen → alle Mannschafts-Kader (teamPortrait); eingefrorene Saison: Schnappschuss
+    const archive  = archiveFor(SEASON_KEY);
+    const clubHtml = archive ? archive.clubHtml : await fetchURL(CLUB_TEAMS_URL).catch(() => '');
     /* Nur die Kader der gewählten Saison — sonst stünden Spieler beider Runden in der Liste */
     const rosters = parseClubRosters(clubHtml).filter(r => !SEASON_KEY || r.season === SEASON_KEY);
 

@@ -2,7 +2,8 @@
 
 Eine statische Web-App (PWA), die den Spielplan der Mannschaften zeigt: Begegnungen,
 Ergebnisse, Tabellen, Favoriten und Spielberichte. Die Daten kommen zur Laufzeit direkt
-von **liga.nu**, es gibt keinen eigenen Server und keine Datenbank.
+von **liga.nu**, es gibt keinen eigenen Server und keine Datenbank. Abgeschlossene
+Saisons liegen als Kopie unter `archiv/` und brauchen liga.nu nicht mehr.
 
 ## Wo sie läuft
 
@@ -18,6 +19,8 @@ Ausgeliefert über GitHub Pages aus diesem Repository.
 | `manifest.json` · `sw.js` | machen sie zur installierbaren App (Homescreen, offline) |
 | `logo.png` · `logo2.png` | Vereinswappen |
 | `index-alt.html` | ältere Fassung, liegt im Repo |
+| `archiv/<saison>/` | eingefrorene liga.nu-Seiten abgeschlossener Saisons (siehe `docs/entscheidungen.md`) |
+| `tools/einfrieren.py` | legt so ein Archiv an |
 
 ## Ändern und ausliefern
 

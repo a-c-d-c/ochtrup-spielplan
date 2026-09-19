@@ -2,6 +2,34 @@
 
 > Warum die Dinge so sind, wie sie sind. Neue Entscheidung? Oben anfügen, mit Datum.
 
+## 2026-09-19 — Abgeschlossene Saisons einfrieren (Sommer 2026)
+
+Ansgars Entscheidung. Die Sommersaison 2026 ist gespielt (20 Mannschaften, 107
+Begegnungen, keine offen). Alle liga.nu-Seiten, die die App für diese Saison je
+anfragt, liegen jetzt als Kopie unter `archiv/sommer-2026/` — 20 Gruppenseiten, 328
+Spielberichte (auch die fremder Begegnungen, damit die Gruppen-Detailansicht wie
+gewohnt funktioniert), 20 Kaderseiten, beide LK-Listen, dazu ein Schnappschuss der
+Vereinsseite. Rund 20 MB.
+
+**Warum:** liga.nu vergibt Gruppen-Nummern je Saison neu und räumt alte Saisons
+irgendwann aus der Vereinsseite. Ohne Kopie würde der Sommer 2026 von selbst
+verschwinden oder falsche Daten zeigen. Außerdem hängt die Saison so nicht mehr an
+den CORS-Proxys — dem häufigsten Ausfallgrund.
+
+**Wie:** `tools/einfrieren.py "MS 2026" sommer-2026` lädt alles direkt von liga.nu
+(ohne Proxy) und schreibt `index.json` (URL → Datei). In `index.html` steht der Ordner
+in `ARCHIVE_DIRS`; `fetchURL()` liefert für die aktive Saison die lokale Kopie, sonst
+geht es wie bisher über die Proxys. Die Parser blieben unverändert, weil rohes HTML
+abgelegt wird — die App sieht dieselben Seiten wie vorher.
+
+**Bewusst so:** Die LK-Listen sind auf liga.nu nicht saisonspezifisch. Eingefroren
+zeigt die Sommer-Statistik die LKs vom 19.09.2026, also vom Saisonende — passender
+als die Winter-LKs, die die Live-Variante später zeigen würde.
+
+**Nächstes Mal:** Nach Ende der Wintersaison 2026/27 dasselbe Skript mit
+`"MS Winter 26/27" winter-2026-27` laufen lassen und den Ordner in `ARCHIVE_DIRS`
+eintragen (älteste zuerst).
+
 ## 2026-09-08 — Service Worker: `no-cache` ja, Caches löschen nein
 
 Löst den offenen Punkt vom 17.08.2026 (weiter unten). Ansgars Entscheidung.
