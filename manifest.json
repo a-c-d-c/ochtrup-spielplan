@@ -1,6 +1,6 @@
 {
-  "name": "Spielplan 26",
-  "short_name": "Spielplan 26",
+  "name": "Spielplan",
+  "short_name": "Spielplan",
   "description": "Spielplan des TC 1928 Ochtrup – Sommer 2026",
   "start_url": "./index.html",
   "display": "standalone",

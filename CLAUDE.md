@@ -10,7 +10,7 @@ Datenbank. `index.html` trägt alles: Aufbau, Gestaltung und Logik. Die Spieldat
 die Seite zur Laufzeit direkt von **liga.nu** über CORS-Proxys.
 
 Ausgeliefert wird über **GitHub Pages**: `a-c-d-c.github.io/ochtrup-spielplan/`
-(im Dock als „Spielplan 26").
+(im Dock als „Spielplan").
 
 ## Nur Ochtrup
 

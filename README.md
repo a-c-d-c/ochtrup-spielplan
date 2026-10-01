@@ -7,7 +7,7 @@ Saisons liegen als Kopie unter `archiv/` und brauchen liga.nu nicht mehr.
 
 ## Wo sie läuft
 
-**https://a-c-d-c.github.io/ochtrup-spielplan/** — im Dock als „Spielplan 26".
+**https://a-c-d-c.github.io/ochtrup-spielplan/** — im Dock als „Spielplan".
 Ausgeliefert über GitHub Pages aus diesem Repository.
 
 ## Dateien
