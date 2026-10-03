@@ -1604,6 +1604,15 @@ function seasonLabel(key) {
   return key;
 }
 
+/* Saison-Schlüssel → Zahl für die zeitliche Reihenfolge: Sommer eines Jahres vor dem
+   Winter, der im selben Jahr beginnt (Sommer 2026 vor Winter 2026/27). */
+function seasonOrder(key) {
+  const w = key.match(/Winter\s+(\d{2})\s*\/\s*(\d{2})/i);
+  if (w) return (2000 + +w[1]) * 2 + 1;
+  const y = key.match(/(\d{4})/);
+  return y ? +y[1] * 2 : 0;
+}
+
 /* Saison des nächsten anstehenden Spiels. liga.nu listet auf der Begegnungs-Seite die
    kommenden Spiele nach Datum, jede Zeile mit ihrer Saison — die erste ist die laufende.
    Wird nur für die Vorauswahl beim allerersten Start gebraucht. */
@@ -1730,12 +1739,16 @@ function applySeason() {
   SEASONS = [];
   ALL_LEAGUES.forEach(l => { if (l.season && SEASONS.indexOf(l.season) === -1) SEASONS.push(l.season); });
 
-  if (SEASONS.length && SEASONS.indexOf(SEASON_KEY) === -1) {
+  /* Beim Öffnen gilt immer die neueste Saison. Ein Wechsel per Umschalter lädt die Seite
+     neu und hält nur bis zum Schließen der App (sessionStorage übersteht das Neuladen). */
+  const newest     = SEASONS.slice().sort((a, b) => seasonOrder(a) - seasonOrder(b)).pop();
+  const keepChoice = sessionStorage.getItem(LS_SEASON) === SEASON_KEY;
+  if (SEASONS.length && (SEASONS.indexOf(SEASON_KEY) === -1 || (!keepChoice && SEASON_KEY !== newest))) {
     /* Die bisherigen (saisonlosen) Einstellungen stammen aus der Zeit vor der Umschaltung
        und gehören zur ältesten gelisteten Saison — dort bleiben sie erhalten, auch wenn
        die App gleich mit der laufenden Saison startet. */
     if (_seasonWasUnset) migrateOldSettings(SEASONS[0]);
-    setSeasonKey(SEASONS.indexOf(_detectedSeason) !== -1 ? _detectedSeason : SEASONS[0]);
+    setSeasonKey(SEASONS.indexOf(_detectedSeason) !== -1 ? _detectedSeason : newest);
     /* Filter, Mannschaftsauswahl und Favoriten hängen an der Saison — nach dem
        Umstellen der Schlüssel neu einlesen, sonst gälte hier der Stand der anderen Saison. */
     const st  = loadState();
@@ -1783,7 +1796,8 @@ function buildSeasonButtons() {
     return;
   }
   if (sub) sub.textContent = 'Spielplan · Münsterland';
-  SEASONS.forEach(key => {
+  /* Immer zeitlich, ältere Saison links — liga.nu ändert seine Reihenfolge sonst je nach Stand */
+  SEASONS.slice().sort((a, b) => seasonOrder(a) - seasonOrder(b)).forEach(key => {
     const btn = document.createElement('button');
     btn.className   = 'btn-season' + (key === SEASON_KEY ? ' on' : '');
     btn.textContent = seasonLabel(key);
@@ -1799,6 +1813,7 @@ function switchSeason(key) {
   if (key === SEASON_KEY) return;
   saveState();
   localStorage.setItem(LS_SEASON, key);
+  sessionStorage.setItem(LS_SEASON, key);
   location.reload();
 }
 
