@@ -2992,9 +2992,8 @@ async function showJahrgang(klasse, primaryStr, parenStr, gender) {
   const wanted = new Set([...primary, ...paren]);
   const effYear   = p => p.year;
   const effGender = p => p.realGender;
-  const hasPlayed = p => (p.einzelWins + p.einzelLosses + p.doppelWins + p.doppelLosses) > 0;
-  // Reihenfolge: 0 = gespielt (fett), 1 = spielberechtigt ohne Bilanz, 2 = eine Klasse tiefer (Klammern)
-  const rank = p => parenSet.has(effYear(p)) ? 2 : (hasPlayed(p) ? 0 : 1);
+  // Reihenfolge: spielberechtigt nach LK, darunter eine Klasse tiefer (Klammern) nach LK
+  const rank = p => parenSet.has(effYear(p)) ? 1 : 0;
   const lkVal = p => parseFloat(p.lk) || 99;
   const players = _statistikData
     .filter(p => { const y = effYear(p); return y && wanted.has(y) && (!gender || effGender(p) === gender || !effGender(p)); })
