@@ -3492,7 +3492,7 @@ async function loadStatistik() {
 
     // Aktueller LK + Geschlecht aus der LK-Vereinsübersicht (clubRankinglistLK): Name → {gender, lk}
     const lkInfo = {};
-    const addLK = (html, g) => { const map = parseLKList(html, g); Object.keys(map).forEach(k => lkInfo[k] = { gender: g, lk: map[k].lk }); };
+    const addLK = (html, g) => { const map = parseLKList(html, g); Object.keys(map).forEach(k => lkInfo[k] = { gender: g, lk: map[k].lk, name: map[k].name, year: map[k].year }); };
     addLK(lkHerren, 'm');
     addLK(lkDamen,  'w');
 
@@ -3501,6 +3501,14 @@ async function loadStatistik() {
     for (let i = 0; i < rosters.length; i++) {
       if (rosterHtml[i]) parseTeamRoster(rosterHtml[i], rosters[i].label, playerMap);
     }
+
+    // Spieler aus der LK-Liste ergänzen, die in keiner Mannschaft gemeldet sind
+    // (z. B. Jugendliche ohne Team) — damit sie bei „Spielberechtigte Spieler" auftauchen
+    Object.keys(lkInfo).forEach(key => {
+      if (playerMap[key]) return;
+      const info = lkInfo[key];
+      playerMap[key] = { name: info.name, year: info.year, lk: info.lk, gender: '', realGender: '', teamGenders: new Set(), einzelWins: 0, einzelLosses: 0, doppelWins: 0, doppelLosses: 0 };
+    });
 
     // Geschlecht festlegen: LK-Liste > eindeutige Mannschafts-Zuordnung (Junioren/Herren=m, Juniorinnen/Damen=w)
     Object.values(playerMap).forEach(p => {
