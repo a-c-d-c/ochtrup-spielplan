@@ -3003,8 +3003,8 @@ function renderAltersklassen() {
     const cs = classes.filter(c => c.g === g);
     h += `<div class="ak-group-label">${jug} &amp; ${erw}</div><div class="ak-row">${cs.map(btn).join('')}</div>`;
   }
-  // U8–U10: keine LK, nicht in den liga.nu-Listen → nur Jahrgänge, keine Knöpfe
-  h += `<div class="ak-kids"><div class="ak-group-label">Kinder bis U10 · nur Sommer ${S}</div>`
+  // U8–U10: keine LK, nicht in den liga.nu-Listen → nur Jahrgänge, keine Knöpfe; nur bei gewählter U12
+  if (_akSelected.has('mU12') || _akSelected.has('wU12')) h += `<div class="ak-kids"><div class="ak-group-label">Kinder bis U10 · nur Sommer ${S}</div>`
     + `<div class="ak-kids-row"><span><b>U8</b> ${S - 8}–${S - 6}</span><span><b>U9</b> ${S - 9}</span><span><b>U10</b> ${S - 10}</span></div>`
     + `<small>Noch ohne LK, deshalb nicht in den liga.nu-Listen – keine Spielerliste möglich.</small></div>`;
   if (!_akSelected.size) { box.innerHTML = h + '<div class="status-msg">Altersklassen antippen, um die Spieler zu sehen.</div>'; return; }
