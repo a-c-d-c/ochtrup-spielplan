@@ -899,6 +899,12 @@
   .ak-sort { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.04em; font-weight: 700; opacity: 0.55; cursor: pointer; user-select: none; -webkit-tap-highlight-color: transparent; }
   .ak-sort.on { opacity: 1; }
   .ak-box-count { font-family: 'DM Sans', sans-serif; font-size: 0.72rem; opacity: 0.7; letter-spacing: 0; margin-left: 4px; }
+  /* Inaktive Spieler: markieren und ausblenden (Altersklassen + Spielerstatistik) */
+  .inaktiv-row { display: flex; gap: 6px; margin-bottom: 12px; }
+  .inaktiv-row .btn { flex: 1; min-width: 0; text-align: center; padding: 9px 6px; font-size: 0.78rem; line-height: 1.3; }
+  .inaktiv-hint { font-size: 0.75rem; opacity: 0.7; margin: -4px 0 12px; }
+  tr.is-inaktiv td { opacity: 0.35 !important; text-decoration: line-through; }
+  table.inaktiv-edit tbody tr { cursor: pointer; -webkit-tap-highlight-color: transparent; }
 
 </style>
 <style id="theme-override-css"></style>
@@ -2968,6 +2974,44 @@ function backFromInfo() {
 const ERW_STICHJAHR = 2027;
 /* ── Menüpunkt „Altersklassen": frei kombinierbare Filter ──
    Jeder Knopf = Jahrgangsblock der eigenen (originären) Altersklasse, Stichjahr wie oben. */
+/* ── Inaktive Spieler: von Hand markiert, gespeichert auf dem Gerät, saisonübergreifend.
+   Gilt für Altersklassen und Spielerstatistik. Schlüssel = Name + Jahrgang. */
+const LS_INAKTIV      = 'spielplan-inaktiv';
+const LS_INAKTIV_HIDE = 'spielplan-inaktiv-ausblenden';
+let _inaktiv = new Set();
+try { _inaktiv = new Set(JSON.parse(localStorage.getItem(LS_INAKTIV) || '[]')); } catch(e) {}
+let _inaktivHide = localStorage.getItem(LS_INAKTIV_HIDE) === '1';
+let _inaktivEdit = false;
+function _pk(p) { return _normName(p.name) + '|' + (p.year || ''); }
+function _isInaktiv(p) { return _inaktiv.has(_pk(p)); }
+function _inaktivVisible(p) { return _inaktivEdit || !_inaktivHide || !_isInaktiv(p); }
+function _inaktivControls() {
+  const n = _statistikData ? _statistikData.filter(_isInaktiv).length : 0;
+  return `<div class="inaktiv-row"><button class="btn btn-filter${_inaktivHide ? ' on' : ''}" onclick="toggleInaktivHide()">Inaktive<br>ausblenden</button>`
+    + `<button class="btn btn-filter${_inaktivEdit ? ' on' : ''}" onclick="toggleInaktivEdit()">${_inaktivEdit ? 'Fertig' : 'Inaktive<br>auswählen' + (n ? ' (' + n + ')' : '')}</button></div>`
+    + (_inaktivEdit ? '<div class="inaktiv-hint">Spieler antippen, um sie als inaktiv zu markieren – nochmal antippen hebt es auf.</div>' : '');
+}
+function _inaktivTr(p) {
+  const cls = _isInaktiv(p) ? ' class="is-inaktiv"' : '';
+  return _inaktivEdit ? `<tr${cls} data-pk="${esc(_pk(p)).replace(/"/g, '&quot;')}" onclick="toggleInaktiv(this.dataset.pk)">` : `<tr${cls}>`;
+}
+function _rerenderSpieler() {
+  renderAltersklassen();
+  const c = document.getElementById('statistik-container');
+  if (c && _statistikData) renderStatistikTable(c);
+}
+function toggleInaktivHide() {
+  _inaktivHide = !_inaktivHide;
+  localStorage.setItem(LS_INAKTIV_HIDE, _inaktivHide ? '1' : '0');
+  _rerenderSpieler();
+}
+function toggleInaktivEdit() { _inaktivEdit = !_inaktivEdit; _rerenderSpieler(); }
+function toggleInaktiv(pk) {
+  if (_inaktiv.has(pk)) _inaktiv.delete(pk); else _inaktiv.add(pk);
+  localStorage.setItem(LS_INAKTIV, JSON.stringify([..._inaktiv]));
+  _rerenderSpieler();
+}
+
 const _akSelected = new Set();
 const _akSort = { key: 'lk', dir: 1 }; // Voreinstellung: beste (niedrigste) LK oben
 function setAkSort(key) {
@@ -3015,7 +3059,7 @@ function renderAltersklassen() {
   const rows = [];
   for (const p of _statistikData) {
     const y = parseInt(p.year, 10);
-    if (!y) continue;
+    if (!y || !_inaktivVisible(p)) continue;
     const c = sel.find(c => y <= c.min && (c.max === 0 || y >= c.max) && (!p.realGender || p.realGender === c.g));
     if (c) rows.push({ p, c });
   }
@@ -3040,13 +3084,13 @@ function renderAltersklassen() {
   let body = '';
   for (const { p, c } of rows) {
     const lk = p.lk && p.lk !== '–' ? _fmtLK(p.lk) : '–';
-    body += '<tr><td>' + esc(p.name) + '</td><td>' + esc(lk) + '</td><td>' + esc(String(p.year))
+    body += _inaktivTr(p) + '<td>' + esc(p.name) + '</td><td>' + esc(lk) + '</td><td>' + esc(String(p.year))
       + '</td><td class="ak-tag ak-' + c.cat + '">' + esc(c.abbr) + '</td>' + (mixed ? '<td>' + c.g + '</td>' : '') + '</tr>';
   }
   const title = sel.map(c => c.abbr + (mixed && c.cat === 'jugend' ? ' ' + c.g : '')).join(' + ');
-  box.innerHTML = h + '<div class="jahrgang-box ak-box"><div class="jahrgang-box-title">' + esc(title)
+  box.innerHTML = h + _inaktivControls() + '<div class="jahrgang-box ak-box"><div class="jahrgang-box-title">' + esc(title)
     + ' <span class="ak-box-count">' + rows.length + ' Spieler</span></div>'
-    + (rows.length ? '<table class="ak-table">' + head + '<tbody>' + body + '</tbody></table>' : '<div class="status-msg">Keine Spieler.</div>')
+    + (rows.length ? '<table class="ak-table' + (_inaktivEdit ? ' inaktiv-edit' : '') + '">' + head + '<tbody>' + body + '</tbody></table>' : '<div class="status-msg">Keine Spieler.</div>')
     + '</div>';
 }
 
@@ -3750,7 +3794,7 @@ function _fmtLK(lk) {
 function renderStatistikTable(container) {
   const col = _statistikSort.col;
   const dir = _statistikSort.dir;
-  const data = _statistikData.filter(p => !p.gender || _statistikGenders.has(p.gender)).sort((a, b) => {
+  const data = _statistikData.filter(p => (!p.gender || _statistikGenders.has(p.gender)) && _inaktivVisible(p)).sort((a, b) => {
     let cmp;
     if (col === 'name') {
       cmp = a.name.localeCompare(b.name, 'de');
@@ -3780,7 +3824,7 @@ function renderStatistikTable(container) {
 
   const genderBtn = (g, label) => `<button class="btn btn-filter${_statistikGenders.has(g) ? ' on' : ''}" onclick="toggleStatistikGender('${g}')">${label}</button>`;
 
-  let html = `<div class="stat-gender-row">${genderBtn('m', 'Herren')}${genderBtn('w', 'Damen')}</div>`;
+  let html = `<div class="stat-gender-row">${genderBtn('m', 'Herren')}${genderBtn('w', 'Damen')}</div>` + _inaktivControls();
 
   if (!data.length) {
     html += '<div class="status-msg">' + (_statistikGenders.size ? 'Keine Spieler in dieser Liste.' : 'Bitte Herren und/oder Damen auswählen.') + '</div>';
@@ -3788,7 +3832,7 @@ function renderStatistikTable(container) {
     return;
   }
 
-  html += `<table class="stat-table"><thead><tr>
+  html += `<table class="stat-table${_inaktivEdit ? ' inaktiv-edit' : ''}"><thead><tr>
     ${th('name','Name')}${th('jahrg','Jahrg.')}${th('lk','LK')}${th('gesamt','Gesamt')}${th('einzel','Einzel')}${th('doppel','Doppel')}
   </tr></thead><tbody>`;
 
@@ -3797,7 +3841,7 @@ function renderStatistikTable(container) {
     const ci = p.name.indexOf(',');
     const nameHtml = esc(ci >= 0 ? p.name.slice(0, ci) : p.name) + '<br><span style="font-size:0.72rem;opacity:0.75">' + esc(ci >= 0 ? p.name.slice(ci + 1).trim() : '') + '</span>';
     const badge = '<span class="gender-badge gb-' + (p.realGender === 'm' ? 'm">m' : p.realGender === 'w' ? 'w">w' : 'x">?') + '</span>';
-    html += `<tr>
+    html += `${_inaktivTr(p)}
       <td><div class="stat-name-cell"><div class="stat-name">${nameHtml}</div>${badge}</div></td>
       <td>${esc(p.year || '–')}</td>
       <td>${esc(_fmtLK(p.lk))}</td>
