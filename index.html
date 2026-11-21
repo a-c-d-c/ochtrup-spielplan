@@ -902,6 +902,8 @@
   .ak-table td.ak-nr + td, .ak-table th.ak-nr + th { width: auto; white-space: normal; text-align: left; padding-left: 4px; }
   .ak-table td.ak-nr + td { font-weight: 600; opacity: 1; }
   .ak-tag { font-weight: 700; opacity: 1 !important; }
+  /* Spielername → tennis.de: sieht aus wie Text, dezent unterstrichen */
+  #info-view .info-content a.name-link, a.name-link { color: inherit !important; text-decoration: underline; text-decoration-color: rgba(144,149,176,0.45); text-underline-offset: 3px; -webkit-tap-highlight-color: transparent; }
   .ak-tag.ak-jugend { color: #84a98d; }
   .ak-tag.ak-herren { color: #8497bf; }
   .ak-tag.ak-damen  { color: #f0aac3; }
@@ -3178,7 +3180,7 @@ function renderAltersklassen() {
   let nr = 0;
   for (const { p, c } of rows) {
     const lk = p.lk && p.lk !== '–' ? _fmtLK(p.lk) : '–';
-    body += '<tr><td class="ak-nr">' + (++nr) + '</td><td>' + esc(p.name) + '</td><td>' + esc(lk) + '</td><td>' + esc(String(p.year))
+    body += '<tr><td class="ak-nr">' + (++nr) + '</td><td>' + _nameLink(p, esc(p.name)) + '</td><td>' + esc(lk) + '</td><td>' + esc(String(p.year))
       + '</td><td class="ak-tag ak-' + c.cat + '">' + esc(c.abbr) + '</td>' + (mixed ? '<td>' + c.g + '</td>' : '') + '</tr>';
   }
   const title = sel.map(c => c.abbr + (mixed && c.cat === 'jugend' ? ' ' + c.g : '')).join(' + ');
@@ -3656,7 +3658,7 @@ async function loadStatistik() {
 
     // Aktueller LK + Geschlecht aus der LK-Vereinsübersicht (clubRankinglistLK): Name → {gender, lk}
     const lkInfo = {};
-    const addLK = (html, g) => { const map = parseLKList(html, g); Object.keys(map).forEach(k => lkInfo[k] = { gender: g, lk: map[k].lk, name: map[k].name, year: map[k].year }); };
+    const addLK = (html, g) => { const map = parseLKList(html, g); Object.keys(map).forEach(k => lkInfo[k] = { gender: g, lk: map[k].lk, name: map[k].name, year: map[k].year, profil: map[k].profil }); };
     addLK(lkHerren, 'm');
     addLK(lkDamen,  'w');
 
@@ -3679,6 +3681,7 @@ async function loadStatistik() {
       const key   = _normName(p.name);
       const info  = lkInfo[key];
       if (info && info.lk && info.lk !== '–') p.lk = info.lk; // aktuellen LK übernehmen (statt Melde-LK aus teamPortrait)
+      p.profil = (info && info.profil) || p.profil || ''; // tennis.de-Spielerprofil (LK-Liste, sonst Kader)
       const teamG = p.teamGenders.size === 1 ? [...p.teamGenders][0] : '';
       p.realGender = (info && info.gender) || teamG || _guessGenderByName(p.name) || '';
       p.gender     = p.realGender; // Statistik-Filter (Herren/Damen); LK-lose nach Geschlecht einsortiert
@@ -3755,6 +3758,10 @@ function parseTeamRoster(html, label, playerMap) {
     if (!p) p = playerMap[key] = { name, year, lk: '–', gender: '', realGender: '', teamGenders: new Set(), einzelWins: 0, einzelLosses: 0, doppelWins: 0, doppelLosses: 0 };
     if (year && !p.year) p.year = year;
     if (lk !== '–') p.lk = lk;
+    // tennis.de-Profil auch aus dem Kader (für Spieler, die nicht in der LK-Liste des Vereins stehen)
+    const profA = nameCell.querySelector('a[href*="tennis.de/spielen/spielerprofil"]');
+    const prof  = ((profA && profA.getAttribute('href')) || '').match(/#id=([A-Za-z0-9]+)$/);
+    if (prof && !p.profil) p.profil = prof[1];
     if (teamGender) p.teamGenders.add(teamGender);
   });
 }
@@ -3775,7 +3782,10 @@ function parseLKList(html, gender) {
     const name  = cellTxt.replace(/\s*\(\d{4}\)\s*$/, '').trim();
     const yearM = cellTxt.match(/\((\d{4})\)/);
     const year  = yearM ? yearM[1] : '';
-    if (name) map[_normName(name)] = { name, year, lk, gender, einzelWins: 0, einzelLosses: 0, doppelWins: 0, doppelLosses: 0 };
+    // liga.nu verlinkt jedes Spielerprofil auf tennis.de (…/spielerprofil.html#id=WF12345) — nur die ID übernehmen
+    const profA  = cells[3].querySelector('a[href*="tennis.de/spielen/spielerprofil"]');
+    const profil = ((profA && profA.getAttribute('href')) || '').match(/#id=([A-Za-z0-9]+)$/);
+    if (name) map[_normName(name)] = { name, year, lk, gender, profil: profil ? profil[1] : '', einzelWins: 0, einzelLosses: 0, doppelWins: 0, doppelLosses: 0 };
   });
   return map;
 }
@@ -3880,6 +3890,11 @@ function _fmtStat(w, l) {
   return `${w}:${l} <span class="${cls}">(${d > 0 ? '+' : ''}${d})</span>`;
 }
 
+/* Name als Link zum Spielerprofil auf tennis.de (neuer Tab); ohne Profil-ID bleibt es reiner Text */
+function _nameLink(p, html) {
+  return p.profil ? `<a class="name-link" href="https://www.tennis.de/spielen/spielerprofil.html#id=${p.profil}" target="_blank" rel="noopener">${html}</a>` : html;
+}
+
 function _fmtLK(lk) {
   const n = parseFloat(lk);
   return isNaN(n) ? lk : n.toFixed(1).replace('.', ',');
@@ -3940,7 +3955,7 @@ function renderStatistikTable(container) {
     const badge = '<span class="gender-badge gb-' + (p.realGender === 'm' ? 'm">m' : p.realGender === 'w' ? 'w">w' : 'x">?') + '</span>';
     html += `<tr>
       <td class="stat-nr">${++nr}</td>
-      <td><div class="stat-name-cell"><div class="stat-name">${nameHtml}</div>${badge}</div></td>
+      <td><div class="stat-name-cell"><div class="stat-name">${_nameLink(p, nameHtml)}</div>${badge}</div></td>
       <td>${esc(p.year || '–')}</td>
       <td>${esc(_fmtLK(p.lk))}</td>
       <td>${_fmtStat(gw, gl)}</td>
