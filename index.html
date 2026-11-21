@@ -907,6 +907,7 @@
   .inaktiv-row .btn { flex: 1; min-width: 0; text-align: center; padding: 9px 6px; font-size: 0.78rem; line-height: 1.3; }
   .inaktiv-row .btn:disabled { opacity: 0.4; cursor: default; }
   .inaktiv-hint { font-size: 0.75rem; opacity: 0.7; margin: -4px 0 12px; }
+  .aktiv-table th:nth-child(n+2), .aktiv-table td:nth-child(n+2) { padding-left: 6px; }
   .aktiv-table tbody tr { cursor: pointer; -webkit-tap-highlight-color: transparent; }
   .aktiv-table td.aktiv-state { color: #6fbf8a; font-weight: 700; font-size: 0.78rem; }
   tr.is-inaktiv td:not(.aktiv-state) { opacity: 0.35 !important; text-decoration: line-through; }
@@ -2987,6 +2988,7 @@ const LS_INAKTIV = 'spielplan-inaktiv';
 let _inaktiv = new Set();
 try { _inaktiv = new Set(JSON.parse(localStorage.getItem(LS_INAKTIV) || '[]')); } catch(e) {}
 let _aktivQ = '', _aktivNurInaktiv = false, _aktivResetTimer = null;
+const _aktivSort = { key: 'name', dir: 1 };
 function _pk(p) { return _normName(p.name) + '|' + (p.year || ''); }
 function _isInaktiv(p) { return _inaktiv.has(_pk(p)); }
 function _inaktivNote(n) {
@@ -3034,9 +3036,18 @@ function renderAktivList() {
   const list = document.getElementById('aktiv-list');
   if (!list || !_statistikData) return;
   const q = _aktivQ.trim().toLowerCase();
+  const d = _aktivSort.dir;
+  const byName = (a, b) => a.name.localeCompare(b.name, 'de') || String(a.year).localeCompare(String(b.year));
+  const lkVal = p => parseFloat(p.lk) || 99; // ohne LK immer ganz unten
+  const yVal  = p => parseInt(p.year, 10) || 0;
+  const cmp = {
+    name: (a, b) => byName(a, b) * d,
+    lk:   (a, b) => ((lkVal(a) === 99) - (lkVal(b) === 99)) || (lkVal(a) - lkVal(b)) * d || byName(a, b),
+    year: (a, b) => ((!yVal(a)) - (!yVal(b))) || (yVal(a) - yVal(b)) * d || byName(a, b)
+  };
   const rows = _statistikData
     .filter(p => (!q || p.name.toLowerCase().includes(q)) && (!_aktivNurInaktiv || _isInaktiv(p)))
-    .sort((a, b) => a.name.localeCompare(b.name, 'de') || String(a.year).localeCompare(String(b.year)));
+    .sort(cmp[_aktivSort.key]);
   document.getElementById('aktiv-nur').classList.toggle('on', _aktivNurInaktiv);
   _aktivCounts();
   if (!rows.length) { list.innerHTML = '<div class="status-msg">' + (_aktivNurInaktiv && !q ? 'Alle Spieler sind aktiv.' : 'Kein Spieler gefunden.') + '</div>'; return; }
@@ -3048,7 +3059,14 @@ function renderAktivList() {
       + '<td>' + esc(p.name) + '</td><td>' + esc(String(p.year || '–')) + '</td><td>' + esc(lk) + '</td>'
       + '<td class="aktiv-state">' + (off ? 'inaktiv' : 'aktiv') + '</td></tr>';
   }
-  list.innerHTML = '<table class="ak-table aktiv-table"><thead><tr><th>Name</th><th>Jahrg.</th><th>LK</th><th>Status</th></tr></thead><tbody>' + body + '</tbody></table>';
+  const th = (key, text) => `<th class="ak-sort${_aktivSort.key === key ? ' on' : ''}" onclick="setAktivSort('${key}')">${text}${_aktivSort.key === key ? (d > 0 ? ' ▲' : ' ▼') : ''}</th>`;
+  list.innerHTML = '<table class="ak-table aktiv-table"><thead><tr>' + th('name', 'Name') + th('year', 'Jahrg.') + th('lk', 'LK')
+    + '<th></th></tr></thead><tbody>' + body + '</tbody></table>';
+}
+function setAktivSort(key) {
+  if (_aktivSort.key === key) _aktivSort.dir = -_aktivSort.dir;
+  else { _aktivSort.key = key; _aktivSort.dir = 1; }
+  renderAktivList();
 }
 function toggleInaktiv(tr) {
   const pk = tr.dataset.pk;
