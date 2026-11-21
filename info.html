@@ -54,6 +54,7 @@
   #acc-mannschaft.open { max-height: 2000px; }
   #acc-spielberechtigung.open { max-height: 2000px; }
   #acc-spielberechtigung-erw.open { max-height: 2000px; }
+  #acc-altersklassen.open { max-height: 30000px; }
   .jahrgang-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; margin-top: 4px; }
   .jahrgang-table th, .jahrgang-table td { padding: 7px 6px; text-align: left; border-bottom: 1px solid rgba(144,149,176,0.18); }
   .jahrgang-table th { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.04em; opacity: 0.6; font-weight: 700; }
@@ -274,6 +275,19 @@
       </table>
       <p class="jahrgang-legend"><em>Wer älter ist, darf auch in jüngeren Altersklassen spielen. Bei Herren und Damen zählen Jugendliche ab Jahrgang 2012 mit.</em></p>
       <p class="jahrgang-legend"><em>Im Spielerfenster lassen sich andere Altersklassen ausblenden – z.&nbsp;B. bei den Herren alle, die schon für Herren 30 spielberechtigt sind.</em></p>
+    </div>
+  </div>
+</div>
+
+<div class="accordion-item">
+  <button class="accordion-btn" data-target="acc-altersklassen" onclick="toggleAccordion('acc-altersklassen'); renderAltersklassen();">
+    Altersklassen
+    <span class="accordion-arrow">▼</span>
+  </button>
+  <div class="accordion-body" id="acc-altersklassen">
+    <div class="accordion-body-inner">
+      <div id="ak-container"></div>
+      <p class="jahrgang-legend"><em>Jeder Knopf zeigt die Spieler, deren eigene Altersklasse das ist (Stichjahr 2027, gilt für Winter 2026/27 und Sommer 2027). Klassen lassen sich beliebig kombinieren – z.&nbsp;B. Herren + Junioren U18 + U15 = wer Herren spielen darf, ohne schon für Herren 30 spielberechtigt zu sein.</em></p>
     </div>
   </div>
 </div>
