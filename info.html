@@ -53,6 +53,7 @@
   #acc-statistik.open { max-height: 8000px; }
   #acc-mannschaft.open { max-height: 2000px; }
   #acc-spielberechtigung.open { max-height: 2000px; }
+  #acc-spielberechtigung-erw.open { max-height: 2000px; }
   .jahrgang-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; margin-top: 4px; }
   .jahrgang-table th, .jahrgang-table td { padding: 7px 6px; text-align: left; border-bottom: 1px solid rgba(144,149,176,0.18); }
   .jahrgang-table th { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.04em; opacity: 0.6; font-weight: 700; }
@@ -233,6 +234,46 @@
       </table>
       <p class="jahrgang-legend"><em>Jahrgänge in Klammern spielen eine Klasse höher als ihre originäre Altersklasse (maximal eine Klasse).</em></p>
       <p class="jahrgang-legend"><em>Kinder bis U10 haben noch keine LK und stehen deshalb nicht in den Listen auf liga.nu. Spielberechtigt ist, wer im genannten Jahrgang geboren ist.</em></p>
+    </div>
+  </div>
+</div>
+
+<div class="accordion-item">
+  <button class="accordion-btn" data-target="acc-spielberechtigung-erw" onclick="toggleAccordion('acc-spielberechtigung-erw')">
+    Spielberechtigung für Erwachsenenmannschaften
+    <span class="accordion-arrow">▼</span>
+  </button>
+  <div class="accordion-body" id="acc-spielberechtigung-erw">
+    <div class="accordion-body-inner">
+      <table class="jahrgang-table">
+        <thead>
+          <tr><th>Altersklasse</th><th>Winter 2026/27 und Sommer 2027</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Herren</td>
+            <td><span class="jahrgang-link" onclick="showErwachsene('m',0)">2012 und älter (inkl. Jugend)</span></td></tr>
+          <tr><td>Herren 30</td>
+            <td><span class="jahrgang-link" onclick="showErwachsene('m',30)">1997 und älter</span></td></tr>
+          <tr><td>Herren 40</td>
+            <td><span class="jahrgang-link" onclick="showErwachsene('m',40)">1987 und älter</span></td></tr>
+          <tr><td>Herren 50</td>
+            <td><span class="jahrgang-link" onclick="showErwachsene('m',50)">1977 und älter</span></td></tr>
+          <tr><td>Herren 60</td>
+            <td><span class="jahrgang-link" onclick="showErwachsene('m',60)">1967 und älter</span></td></tr>
+          <tr><td>Damen</td>
+            <td><span class="jahrgang-link" onclick="showErwachsene('w',0)">2012 und älter (inkl. Jugend)</span></td></tr>
+          <tr><td>Damen 30</td>
+            <td><span class="jahrgang-link" onclick="showErwachsene('w',30)">1997 und älter</span></td></tr>
+          <tr><td>Damen 40</td>
+            <td><span class="jahrgang-link" onclick="showErwachsene('w',40)">1987 und älter</span></td></tr>
+          <tr><td>Damen 50</td>
+            <td><span class="jahrgang-link" onclick="showErwachsene('w',50)">1977 und älter</span></td></tr>
+          <tr><td>Damen 60</td>
+            <td><span class="jahrgang-link" onclick="showErwachsene('w',60)">1967 und älter</span></td></tr>
+        </tbody>
+      </table>
+      <p class="jahrgang-legend"><em>Wer älter ist, darf auch in jüngeren Altersklassen spielen. Bei Herren und Damen zählen Jugendliche ab Jahrgang 2012 mit.</em></p>
+      <p class="jahrgang-legend"><em>Im Spielerfenster lassen sich andere Altersklassen ausblenden – z.&nbsp;B. bei den Herren alle, die schon für Herren 30 spielberechtigt sind.</em></p>
     </div>
   </div>
 </div>

@@ -891,6 +891,11 @@
   .jahrgang-player-list li.played .jp-name { font-weight: 800; color: #fff; }
   .jp-name { font-weight: 600; }
   .jp-meta { opacity: 0.7; font-size: 0.8rem; white-space: nowrap; }
+  .erw-filter-label { font-size: 0.75rem; opacity: 0.65; margin: -4px 0 6px; }
+  .erw-filter-row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+  .erw-filter-row .btn { flex: 1 1 calc(33% - 6px); min-width: 0; text-align: center; padding: 7px 4px; font-size: 0.78rem; line-height: 1.2; }
+  .erw-filter-row .btn small { display: block; font-size: 0.68rem; opacity: 0.75; font-weight: 500; }
+  .erw-count { font-size: 0.75rem; opacity: 0.6; margin-bottom: 2px; }
   .jahrgang-modal-close { width: 100%; margin-bottom: 16px; padding: 13px; background: rgba(144,149,176,0.12); border: 1px solid rgba(144,149,176,0.5); border-radius: 22px; color: #c8cade; font-family: inherit; font-size: 0.95rem; font-weight: 600; cursor: pointer; }
 
 </style>
@@ -1084,6 +1089,7 @@
     <button class="jahrgang-modal-close" onclick="closeJahrgang()">Schließen</button>
     <div class="jahrgang-modal-title" id="jahrgang-modal-title"></div>
     <div class="jahrgang-modal-sub" id="jahrgang-modal-sub"></div>
+    <div id="jahrgang-modal-filter"></div>
     <div id="jahrgang-modal-body"></div>
   </div>
 </div>
@@ -2977,6 +2983,7 @@ async function showJahrgang(klasse, primaryStr, parenStr, gender) {
   const body  = document.getElementById('jahrgang-modal-body');
   title.textContent = 'Spielberechtigte Spieler ' + klasse;
   sub.textContent = 'Jahrgänge ' + primary.join(', ') + (paren.length ? ' (' + paren.join(', ') + ' = eine Klasse höher)' : '');
+  document.getElementById('jahrgang-modal-filter').innerHTML = '';
   body.innerHTML = '<div class="loading-row"><div class="spinner"></div>Spieler werden geladen …</div>';
   document.getElementById('jahrgang-modal').classList.add('open');
 
@@ -3032,6 +3039,103 @@ async function showJahrgang(klasse, primaryStr, parenStr, gender) {
   } else {
     body.innerHTML = '<ul class="jahrgang-player-list">' + renderLis(players) + '</ul>';
   }
+}
+
+/* ── Fenster: Spielberechtigte Spieler Erwachsenenmannschaften ──
+   Stichjahr = Kalenderjahr, in dem das Alter zählt (Winter 2026/27 und Sommer 2027 → 2027).
+   Jahrgangsblöcke: Jugend (ab Jahrgang 2012), offene Klasse, 30, 40, 50, 60. Wer älter ist,
+   darf auch in jüngeren Klassen spielen — die Filter blenden solche Blöcke bei Bedarf aus. */
+const ERW_STICHJAHR = 2027;
+const _erwExcluded = {}; // je Klasse: Set der ausgeblendeten Blöcke (bleibt während der Sitzung)
+
+function _erwBands(gender) {
+  const S = ERW_STICHJAHR, base = gender === 'w' ? 'Damen' : 'Herren';
+  // min = jüngster Jahrgang des Blocks, max = ältester (0 = ohne Grenze)
+  return [
+    { age: -1, label: 'Jugend',     min: S - 15, max: S - 18 },
+    { age: 0,  label: base,         min: S - 19, max: S - 29 },
+    { age: 30, label: base + ' 30', min: S - 30, max: S - 39 },
+    { age: 40, label: base + ' 40', min: S - 40, max: S - 49 },
+    { age: 50, label: base + ' 50', min: S - 50, max: S - 59 },
+    { age: 60, label: base + ' 60', min: S - 60, max: 0 }
+  ];
+}
+
+function _erwBandOf(year, bands) {
+  return bands.find(b => year <= b.min && (b.max === 0 || year >= b.max));
+}
+
+async function showErwachsene(gender, age) {
+  const bands = _erwBands(gender);
+  const klasse = bands.find(b => b.age === age).label;
+  const key = gender + age;
+  if (!_erwExcluded[key]) _erwExcluded[key] = new Set();
+  const excl = _erwExcluded[key];
+  // Spielberechtigt: alle Blöcke ab dieser Altersklasse; Jugend nur in der offenen Klasse
+  const allowed = bands.filter(b => b.age === -1 ? age === 0 : b.age >= age);
+  const youngestOk = Math.max(...allowed.map(b => b.min));
+
+  const title  = document.getElementById('jahrgang-modal-title');
+  const sub    = document.getElementById('jahrgang-modal-sub');
+  const filter = document.getElementById('jahrgang-modal-filter');
+  const body   = document.getElementById('jahrgang-modal-body');
+  title.textContent = 'Spielberechtigte Spieler ' + klasse;
+  sub.textContent = 'Jahrgang ' + youngestOk + ' und älter';
+  const fmtYears = b => b.age === -1 ? b.max + '–' + b.min : b.min + ' u. älter';
+  const others = allowed.filter(b => b.age !== age);
+  filter.innerHTML = others.length
+    ? '<div class="erw-filter-label">Antippen blendet alle aus, die dort spielberechtigt sind:</div><div class="erw-filter-row">'
+      + others.map(b => `<button class="btn btn-filter${excl.has(b.age) ? '' : ' on'}" onclick="toggleErwFilter('${gender}',${age},${b.age})">${esc(b.label)}<small>${fmtYears(b)}</small></button>`).join('')
+      + '</div>'
+    : '';
+  if (!_statistikData) body.innerHTML = '<div class="loading-row"><div class="spinner"></div>Spieler werden geladen …</div>';
+  document.getElementById('jahrgang-modal').classList.add('open');
+
+  if (!_statistikData) {
+    try { await loadStatistik(); } catch(e) {}
+  }
+  if (!_statistikData) {
+    body.innerHTML = '<div class="status-msg">Spielerdaten konnten nicht geladen werden.</div>';
+    return;
+  }
+
+  const lkVal = p => parseFloat(p.lk) || 99;
+  const players = _statistikData.filter(p => {
+    const y = parseInt(p.year, 10);
+    if (!y) return false;
+    if (p.realGender && p.realGender !== gender) return false;
+    const b = _erwBandOf(y, bands);
+    return b && allowed.includes(b) && !excl.has(b.age);
+  }).sort((a, b) => (lkVal(a) - lkVal(b)) || a.name.localeCompare(b.name, 'de'));
+
+  if (!players.length) {
+    body.innerHTML = '<div class="status-msg">Keine Spieler gefunden.</div>';
+    return;
+  }
+  let h = '<div class="erw-count">' + players.length + ' Spieler</div><ul class="jahrgang-player-list">';
+  for (const p of players) {
+    const gw = p.einzelWins + p.doppelWins, gl = p.einzelLosses + p.doppelLosses;
+    const played = (gw + gl) > 0;
+    let meta = p.year;
+    if (p.lk && p.lk !== '–') meta += ' · LK ' + _fmtLK(p.lk);
+    if (played) meta += ' · ' + gw + ':' + gl;
+    h += '<li' + (played ? ' class="played"' : '') + '><span class="jp-name">' + esc(p.name) + '</span><span class="jp-meta">' + esc(meta) + '</span></li>';
+  }
+  body.innerHTML = h + '</ul>';
+}
+
+function toggleErwFilter(gender, age, bandAge) {
+  const excl = _erwExcluded[gender + age];
+  if (bandAge === -1) {
+    if (excl.has(-1)) excl.delete(-1); else excl.add(-1);
+  } else if (excl.has(bandAge)) {
+    // wieder einblenden: auch alle jüngeren Altersklassen (sonst wäre der Block über sie ausgeschlossen)
+    _erwBands(gender).forEach(b => { if (b.age > 0 && b.age <= bandAge) excl.delete(b.age); });
+  } else {
+    // ausblenden: alle, die für diese Altersklasse spielberechtigt sind — also auch alle älteren
+    _erwBands(gender).forEach(b => { if (b.age >= bandAge) excl.add(b.age); });
+  }
+  showErwachsene(gender, age);
 }
 
 function closeJahrgang() {
