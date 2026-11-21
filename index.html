@@ -3036,7 +3036,7 @@ function renderAltersklassen() {
   rows.sort(cmp[_akSort.key]);
 
   const th = (key, text) => `<th class="ak-sort${_akSort.key === key ? ' on' : ''}" onclick="setAkSort('${key}')">${text}${_akSort.key === key ? (d > 0 ? ' ▲' : ' ▼') : ''}</th>`;
-  const head = '<thead><tr>' + th('name', 'Name') + th('lk', 'LK') + th('year', 'Jahrgang') + th('ak', 'AK') + (mixed ? th('g', 'm/w') : '') + '</tr></thead>';
+  const head = '<thead><tr>' + th('name', 'Name') + th('lk', 'LK') + th('year', 'Jahrg.') + th('ak', 'AK') + (mixed ? th('g', 'm/w') : '') + '</tr></thead>';
   let body = '';
   for (const { p, c } of rows) {
     const lk = p.lk && p.lk !== '–' ? _fmtLK(p.lk) : '–';
