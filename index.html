@@ -910,6 +910,14 @@
   .ak-box.ak-jugend { border-color: #84a98d; background: rgba(3,78,22,0.18); }
   .ak-box.ak-herren { border-color: #8497bf; background: rgba(3,42,122,0.22); }
   .ak-box.ak-damen  { border-color: #f0aac3; background: rgba(220,80,130,0.12); }
+  .ak-table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+  .ak-table th, .ak-table td { padding: 7px 4px; text-align: left; border-bottom: 1px solid rgba(144,149,176,0.14); }
+  .ak-table tr:last-child td { border-bottom: none; }
+  .ak-table td:first-child { font-weight: 600; }
+  .ak-table th:nth-child(n+2), .ak-table td:nth-child(n+2) { width: 1%; white-space: nowrap; text-align: right; padding-left: 12px; }
+  .ak-table td:nth-child(n+2) { opacity: 0.8; font-variant-numeric: tabular-nums; }
+  .ak-sort { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.04em; font-weight: 700; opacity: 0.55; cursor: pointer; user-select: none; -webkit-tap-highlight-color: transparent; }
+  .ak-sort.on { opacity: 1; }
   .ak-box-count { font-family: 'DM Sans', sans-serif; font-size: 0.72rem; opacity: 0.7; letter-spacing: 0; margin-left: 4px; }
   .jahrgang-modal-close { width: 100%; margin-bottom: 16px; padding: 13px; background: rgba(144,149,176,0.12); border: 1px solid rgba(144,149,176,0.5); border-radius: 22px; color: #c8cade; font-family: inherit; font-size: 0.95rem; font-weight: 600; cursor: pointer; }
 
@@ -3158,6 +3166,12 @@ function toggleErwFilter(gender, age, bandAge) {
 /* ── Menüpunkt „Altersklassen": frei kombinierbare Filter ──
    Jeder Knopf = Jahrgangsblock der eigenen (originären) Altersklasse, Stichjahr wie oben. */
 const _akSelected = new Set();
+const _akSort = { key: 'lk', dir: 1 }; // Voreinstellung: beste (niedrigste) LK oben
+function setAkSort(key) {
+  if (_akSort.key === key) _akSort.dir = -_akSort.dir;
+  else { _akSort.key = key; _akSort.dir = 1; }
+  renderAltersklassen();
+}
 function _akClasses() {
   const S = ERW_STICHJAHR, out = [];
   for (const [g, jug, erw] of [['m', 'Junioren', 'Herren'], ['w', 'Juniorinnen', 'Damen']]) {
@@ -3185,26 +3199,31 @@ function renderAltersklassen() {
   if (!_akSelected.size) { box.innerHTML = h + '<div class="status-msg">Altersklassen antippen, um die Spieler zu sehen.</div>'; return; }
   if (!_statistikData) { box.innerHTML = h + '<div class="loading-row"><div class="spinner"></div>Spieler werden geladen …</div>'; return; }
 
-  const lkVal = p => parseFloat(p.lk) || 99;
+  const lkVal = p => parseFloat(p.lk) || 99; // ohne LK ganz unten
+  const byName = (a, b) => a.name.localeCompare(b.name, 'de');
+  const cmp = {
+    name: byName,
+    lk:   (a, b) => ((lkVal(a) === 99) - (lkVal(b) === 99)) || (lkVal(a) - lkVal(b)) * _akSort.dir || byName(a, b),
+    year: (a, b) => ((parseInt(a.year, 10) || 0) - (parseInt(b.year, 10) || 0)) * _akSort.dir || byName(a, b)
+  };
+  const sortFn = _akSort.key === 'name' ? (a, b) => byName(a, b) * _akSort.dir : cmp[_akSort.key];
+  const th = (key, text) => `<th class="ak-sort${_akSort.key === key ? ' on' : ''}" onclick="setAkSort('${key}')">${text}${_akSort.key === key ? (_akSort.dir > 0 ? ' ▲' : ' ▼') : ''}</th>`;
+  const head = '<thead><tr>' + th('name', 'Name') + th('lk', 'LK') + th('year', 'Jahrgang') + '</tr></thead>';
   const sel = classes.filter(c => _akSelected.has(c.id));
   let total = 0, list = '';
   for (const c of sel) {
     const ps = _statistikData.filter(p => {
       const y = parseInt(p.year, 10);
       return y && y <= c.min && (c.max === 0 || y >= c.max) && (!p.realGender || p.realGender === c.g);
-    }).sort((a, b) => (lkVal(a) - lkVal(b)) || a.name.localeCompare(b.name, 'de'));
+    }).sort(sortFn);
     total += ps.length;
-    let lis = '';
+    let rows = '';
     for (const p of ps) {
-      const gw = p.einzelWins + p.doppelWins, gl = p.einzelLosses + p.doppelLosses;
-      const played = (gw + gl) > 0;
-      let meta = p.year;
-      if (p.lk && p.lk !== '–') meta += ' · LK ' + _fmtLK(p.lk);
-      if (played) meta += ' · ' + gw + ':' + gl;
-      lis += '<li' + (played ? ' class="played"' : '') + '><span class="jp-name">' + esc(p.name) + '</span><span class="jp-meta">' + esc(meta) + '</span></li>';
+      const lk = p.lk && p.lk !== '–' ? _fmtLK(p.lk) : '–';
+      rows += '<tr><td>' + esc(p.name) + '</td><td>' + esc(lk) + '</td><td>' + esc(String(p.year)) + '</td></tr>';
     }
     list += `<div class="jahrgang-box ak-box ak-${c.cat}"><div class="jahrgang-box-title">${esc(c.label)} <span class="ak-box-count">${ps.length} · ${yrs(c)}</span></div>`
-      + (ps.length ? '<ul class="jahrgang-player-list">' + lis + '</ul>' : '<div class="status-msg">Keine Spieler.</div>') + '</div>';
+      + (ps.length ? '<table class="ak-table">' + head + '<tbody>' + rows + '</tbody></table>' : '<div class="status-msg">Keine Spieler.</div>') + '</div>';
   }
   box.innerHTML = h + '<div class="erw-count">' + total + ' Spieler</div>' + list;
 }
