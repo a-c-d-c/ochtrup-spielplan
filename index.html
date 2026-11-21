@@ -183,6 +183,8 @@
     display: flex;
     flex-direction: column;
     gap: 3px;
+    min-width: 0; /* darf schrumpfen, damit lange Spielklassen umbrechen statt in die Tageszahl zu laufen */
+    padding-right: 6px;
   }
   .nm-teams {
     display: flex;
@@ -214,7 +216,8 @@
     text-transform: uppercase;
     letter-spacing: 0.04em;
     margin-top: 8px;
-    white-space: nowrap;
+    white-space: normal; /* lange Bezeichnung (z. B. „… · 2. Mannschaft") bricht um */
+    line-height: 1.35;
     position: relative;
     isolation: isolate;
   }
@@ -1704,6 +1707,21 @@ function buildTeamCSS(leagues, theme) {
   }).join('\n');
 }
 
+/* Spielklasse für Karten, „Nächstes Spiel", Spielbericht und Mannschaftsstatistik.
+   Hat der Verein in derselben Altersklasse mehrere Mannschaften (z. B. „Junioren U18 2er 1"
+   und „… 2er 2" — beide „Junioren U18 2er Bezirksklasse"), kommt die Nummer dazu:
+   „Junioren U18 2er Bezirksklasse · 2. Mannschaft". Altersklasse = Name ohne Nummer und ohne 2er/4er/6er. */
+function _teamNr(l)   { const m = (l.label || '').match(/\s(\d+)$/); return m ? +m[1] : 0; }
+function _teamBase(l) { return (l.label || '').replace(/\s+\d+$/, '').replace(/\s+\d+er\b/i, '').trim(); }
+function leagueDisplayLabel(league) {
+  const base = league.leagueLabel || league.label;
+  const nr = _teamNr(league);
+  if (!nr) return base;
+  const same = (LEAGUES || []).filter(l => l.season === league.season && _teamBase(l) === _teamBase(league));
+  // geschützte Leerzeichen: Umbruch nur vor „2. Mannschaft", nie mitten darin
+  return same.length > 1 ? base + '\u00a0· ' + nr + '.\u00a0Mannschaft' : base;
+}
+
 function formatTeamLabel(label) {
   const m = label.match(/^(.*?)\s+((?:Kreis|Bezirks|M\u00fcnsterland|Verbands|Landes|Westfalen|Generali)\S*.*)$/i);
   if (m) return esc(m[1]) + '<br><span style="font-size:0.78rem;opacity:0.8">' + esc(m[2]) + '</span>';
@@ -2180,7 +2198,7 @@ function parseLeague(html, league) {
       homeTeam, awayTeam, result, note, reportUrl,
       isHome: homeTeam.includes(CLUB_NAME),
       team:   league.team,
-      label:  league.leagueLabel || league.label
+      label:  leagueDisplayLabel(league)
     });
   }
 
@@ -2253,7 +2271,7 @@ function parseLeagueAll(html, league) {
       homeTeam, awayTeam, result, reportUrl,
       isHome: isClubHome,
       isClubMatch: isClubHome || isClubAway,
-      team: league.team, label: league.leagueLabel || league.label
+      team: league.team, label: leagueDisplayLabel(league)
     });
   }
   return matches;
