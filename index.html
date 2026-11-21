@@ -125,6 +125,8 @@
     color: #fff;
     line-height: 1;
   }
+  .header-club-link { color: inherit; text-decoration: none; }
+  .header-club-link:hover { text-decoration: underline; }
   .header p {
     color: #7a7f96;
     font-size: 0.75rem;
@@ -961,7 +963,7 @@
   <button class="btn-info" onclick="showInfo()" title="Info">i</button>
   <div class="header-title">
     <img src="logo.png" class="header-logo" alt="TC 1928 Ochtrup Logo" onerror="this.style.display='none'">
-    <h1>TC 1928 Ochtrup</h1>
+    <h1><a class="header-club-link" href="https://wtv.liga.nu/cgi-bin/WebObjects/nuLigaTENDE.woa/wa/clubInfoDisplay?club=26831" target="_blank" rel="noopener" title="Vereinsseite auf liga.nu">TC 1928 Ochtrup</a></h1>
   </div>
   <p id="header-sub">Spielplan · Münsterland</p>
   <div class="season-row" id="season-row"></div>
