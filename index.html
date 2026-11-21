@@ -910,6 +910,8 @@
   .ak-box.ak-jugend { border-color: #84a98d; background: rgba(3,78,22,0.18); }
   .ak-box.ak-herren { border-color: #8497bf; background: rgba(3,42,122,0.22); }
   .ak-box.ak-damen  { border-color: #f0aac3; background: rgba(220,80,130,0.12); }
+  .ak-season { border-left: 3px solid rgba(144,149,176,0.5); padding: 4px 0 4px 10px; margin: 2px 0 14px; font-weight: 700; font-size: 0.9rem; }
+  .ak-season small { display: block; font-weight: 500; font-size: 0.75rem; opacity: 0.65; margin-top: 2px; }
   .ak-table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
   .ak-table th, .ak-table td { padding: 7px 4px; text-align: left; border-bottom: 1px solid rgba(144,149,176,0.14); }
   .ak-table tr:last-child td { border-bottom: none; }
@@ -3191,7 +3193,8 @@ function renderAltersklassen() {
   const classes = _akClasses();
   const yrs = c => c.max === 0 ? c.min + ' u. älter' : c.max + '–' + c.min;
   const btn = c => `<button class="btn ak-btn ak-${c.cat}${_akSelected.has(c.id) ? ' on' : ''}" onclick="toggleAltersklasse('${c.id}')">${esc(c.short)}<small>${yrs(c)}</small></button>`;
-  let h = '';
+  const S = ERW_STICHJAHR;
+  let h = `<div class="ak-season">Winter ${S - 1}/${String(S).slice(2)} und Sommer ${S}<small>Stichjahr ${S}: maßgeblich ist das Alter, das man im Jahr ${S} erreicht.</small></div>`;
   for (const [g, jug, erw] of [['m', 'Junioren', 'Herren'], ['w', 'Juniorinnen', 'Damen']]) {
     const cs = classes.filter(c => c.g === g);
     h += `<div class="ak-group-label">${jug} &amp; ${erw}</div><div class="ak-row">${cs.map(btn).join('')}</div>`;

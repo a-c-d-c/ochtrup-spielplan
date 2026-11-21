@@ -28,6 +28,7 @@
     margin-left: 12px;
     flex-shrink: 0;
   }
+  .accordion-sub { display: block; font-size: 0.78rem; font-weight: 500; opacity: 0.6; margin-top: 2px; }
   .accordion-btn.open .accordion-arrow { transform: rotate(180deg); }
   .accordion-body {
     max-height: 0;
@@ -281,13 +282,13 @@
 
 <div class="accordion-item">
   <button class="accordion-btn" data-target="acc-altersklassen" onclick="toggleAccordion('acc-altersklassen'); renderAltersklassen();">
-    Altersklassen
+    <span>Altersklassen<span class="accordion-sub">Winter 2026/27 und Sommer 2027</span></span>
     <span class="accordion-arrow">▼</span>
   </button>
   <div class="accordion-body" id="acc-altersklassen">
     <div class="accordion-body-inner">
       <div id="ak-container"></div>
-      <p class="jahrgang-legend"><em>Jeder Knopf zeigt die Spieler, deren eigene Altersklasse das ist (Stichjahr 2027, gilt für Winter 2026/27 und Sommer 2027). Klassen lassen sich beliebig kombinieren – z.&nbsp;B. Herren + Junioren U18 + U15 = wer Herren spielen darf, ohne schon für Herren 30 spielberechtigt zu sein.</em></p>
+      <p class="jahrgang-legend"><em>Jeder Knopf zeigt die Spieler, deren eigene Altersklasse das ist. Klassen lassen sich beliebig kombinieren – z.&nbsp;B. Herren + Junioren U18 + U15 = wer Herren spielen darf, ohne schon für Herren 30 spielberechtigt zu sein.</em></p>
     </div>
   </div>
 </div>
