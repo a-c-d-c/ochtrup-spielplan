@@ -3576,7 +3576,7 @@ function updateHeaderH() {
   document.documentElement.style.setProperty('--header-h', (h.offsetHeight + mb) + 'px');
 }
 
-setTheme(localStorage.getItem(LS_THEME) || 'light');
+setTheme(localStorage.getItem(LS_THEME) || 'dark');
 initOverlays();
 updateHeaderH();
 document.fonts.ready.then(updateHeaderH);
