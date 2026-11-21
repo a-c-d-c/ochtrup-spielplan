@@ -761,6 +761,8 @@
   .stat-table th.stat-nr { color: #7a7f96; opacity: 1; }
   .stat-table td.stat-nr + td { color: #e8eaf0; white-space: normal; min-width: 100px; }
   .stat-table tr:last-child td { border-bottom: none; }
+  .stat-table td.stat-klasse { white-space: normal; min-width: 80px; opacity: 0.8; }
+  #mannschaft-container { overflow-x: auto; -webkit-overflow-scrolling: touch; }
   .stat-rank-btn { display: inline-flex; align-items: center; justify-content: center; min-width: 28px; height: 28px; padding: 0 6px; border-radius: 50px; background: rgba(200,202,216,0.15); border: none; cursor: pointer; color: #e8eaf0; font-size: 0.82rem; font-weight: 700; font-family: inherit; }
   .stat-table td:last-child { text-align: center; }
   .stat-diff-pos  { color: #28a856; font-weight: 600; }
@@ -1707,19 +1709,30 @@ function buildTeamCSS(leagues, theme) {
   }).join('\n');
 }
 
-/* Spielklasse für Karten, „Nächstes Spiel", Spielbericht und Mannschaftsstatistik.
-   Hat der Verein in derselben Altersklasse mehrere Mannschaften (z. B. „Junioren U18 2er 1"
-   und „… 2er 2" — beide „Junioren U18 2er Bezirksklasse"), kommt die Nummer dazu:
-   „Junioren U18 2er Bezirksklasse · 2. Mannschaft". Altersklasse = Name ohne Nummer und ohne 2er/4er/6er. */
+/* Mannschaften benennen: Hat der Verein in derselben Altersklasse mehrere Mannschaften
+   (liga.nu: „Junioren U18 2er 1" und „… 2er 2"), bekommen sie römische Ziffern:
+   „Junioren U18 2er I", „Junioren U18 2er II". Sonst bleibt der Name ohne Ziffer.
+   Gleiche Altersklasse = Name ohne Nummer und ohne 2er/4er/6er (U15 4er 1 + U15 2er 2 → I/II). */
 function _teamNr(l)   { const m = (l.label || '').match(/\s(\d+)$/); return m ? +m[1] : 0; }
-function _teamBase(l) { return (l.label || '').replace(/\s+\d+$/, '').replace(/\s+\d+er\b/i, '').trim(); }
-function leagueDisplayLabel(league) {
-  const base = league.leagueLabel || league.label;
-  const nr = _teamNr(league);
-  if (!nr) return base;
+function _teamFull(l) { return (l.label || '').replace(/\s+\d+$/, '').trim(); }
+function _teamBase(l) { return _teamFull(l).replace(/\s+\d+er\b/i, '').trim(); }
+function _roman(n)    { return ['', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X'][n] || String(n); }
+function teamShortName(league) {
+  const full = _teamFull(league), nr = _teamNr(league);
+  if (!nr) return full;
   const same = (LEAGUES || []).filter(l => l.season === league.season && _teamBase(l) === _teamBase(league));
-  // geschützte Leerzeichen: Umbruch nur vor „2. Mannschaft", nie mitten darin
-  return same.length > 1 ? base + '\u00a0· ' + nr + '.\u00a0Mannschaft' : base;
+  return same.length > 1 ? full + ' ' + _roman(nr) : full;
+}
+/* Spielklasse für Karten, „Nächstes Spiel" und Spielbericht — mit Ziffer, falls nötig:
+   „Junioren U18 2er Bezirksklasse" → „Junioren U18 2er II Bezirksklasse". */
+function leagueDisplayLabel(league) {
+  const ll = league.leagueLabel || league.label;
+  const full = _teamFull(league), short = teamShortName(league);
+  if (short === full) return ll;
+  if (ll.startsWith(full)) return short + ll.slice(full.length);
+  // Spielklasse ohne 2er/4er (Winter: „Herren 40 4er 2" spielt „Herren 40 Bezirksklasse")
+  const base = _teamBase(league);
+  return ll.startsWith(base) ? short + ll.slice(base.length) : ll + ' (' + short + ')';
 }
 
 function formatTeamLabel(label) {
@@ -4056,16 +4069,20 @@ function _mannschaftRank(t) {
 function renderMannschaftTable(container) {
   const col = _mannschaftSort.col;
   const dir = _mannschaftSort.dir;
+  // Kurzname (z. B. „Junioren U18-II") und Spielklasse (z. B. „Bezirksklasse") aus der Mannschaftsliste
+  const lg = t => LEAGUES.find(l => l.team === t.key);
+  const nameOf  = t => { const l = lg(t); return l ? teamShortName(l) : t.label; };
+  const klasseOf = t => { const l = lg(t); return (l && l.sublabel) || ''; };
   const data = [..._mannschaftData].sort((x, y) => {
     let cmp;
     if (col === 'name') {
-      cmp = x.label.localeCompare(y.label, 'de');
+      cmp = nameOf(x).localeCompare(nameOf(y), 'de');
     } else if (col === 'rang') {
       cmp = _mannschaftRank(x) - _mannschaftRank(y);
     } else {
       cmp = _mannschaftDiff(x, col) - _mannschaftDiff(y, col);
     }
-    return cmp !== 0 ? cmp * dir : x.label.localeCompare(y.label, 'de');
+    return cmp !== 0 ? cmp * dir : nameOf(x).localeCompare(nameOf(y), 'de');
   });
 
   const th = (id, label) => {
@@ -4075,13 +4092,14 @@ function renderMannschaftTable(container) {
   };
 
   let html = `<table class="stat-table"><thead><tr>
-    ${th('name','Mannschaft')}${th('gesamt','Gesamt')}${th('heim','Heim')}${th('auswaerts','Auswärts')}${th('rang','Rang')}
+    ${th('name','Mannschaft')}<th>Spielklasse</th>${th('gesamt','Gesamt')}${th('heim','Heim')}${th('auswaerts','Auswärts')}${th('rang','Rang')}
   </tr></thead><tbody>`;
   for (const t of data) {
     const rank = _mannschaftRank(t);
     const rankDisplay = rank === 999 ? '–' : String(rank);
     html += `<tr>
-      <td>${esc(t.label)}</td>
+      <td>${esc(nameOf(t))}</td>
+      <td class="stat-klasse">${esc(klasseOf(t))}</td>
       <td>${_fmtStat(t.gF, t.gA)}</td>
       <td>${_fmtStat(t.hF, t.hA)}</td>
       <td>${_fmtStat(t.aF, t.aA)}</td>
