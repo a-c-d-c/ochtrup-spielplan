@@ -907,9 +907,6 @@
   .ak-btn.ak-herren.on { border-color: #8497bf; background: #0d1c44; color: #fff; }
   .ak-btn.ak-damen { border-color: rgba(220,80,130,0.28); background: rgba(220,80,130,0.07); color: #b2769b; }
   .ak-btn.ak-damen.on { border-color: #f0aac3; background: #532946; color: #fff; }
-  .ak-box.ak-jugend { border-color: #84a98d; background: rgba(3,78,22,0.18); }
-  .ak-box.ak-herren { border-color: #8497bf; background: rgba(3,42,122,0.22); }
-  .ak-box.ak-damen  { border-color: #f0aac3; background: rgba(220,80,130,0.12); }
   .ak-season { border-left: 3px solid rgba(144,149,176,0.5); padding: 4px 0 4px 10px; margin: 2px 0 14px; font-weight: 700; font-size: 0.9rem; }
   .ak-season small { display: block; font-weight: 500; font-size: 0.75rem; opacity: 0.65; margin-top: 2px; }
   .ak-table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
@@ -918,6 +915,10 @@
   .ak-table td:first-child { font-weight: 600; }
   .ak-table th:nth-child(n+2), .ak-table td:nth-child(n+2) { width: 1%; white-space: nowrap; text-align: right; padding-left: 12px; }
   .ak-table td:nth-child(n+2) { opacity: 0.8; font-variant-numeric: tabular-nums; }
+  .ak-tag { font-weight: 700; opacity: 1 !important; }
+  .ak-tag.ak-jugend { color: #84a98d; }
+  .ak-tag.ak-herren { color: #8497bf; }
+  .ak-tag.ak-damen  { color: #f0aac3; }
   .ak-sort { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.04em; font-weight: 700; opacity: 0.55; cursor: pointer; user-select: none; -webkit-tap-highlight-color: transparent; }
   .ak-sort.on { opacity: 1; }
   .ak-box-count { font-family: 'DM Sans', sans-serif; font-size: 0.72rem; opacity: 0.7; letter-spacing: 0; margin-left: 4px; }
@@ -3177,13 +3178,16 @@ function setAkSort(key) {
 function _akClasses() {
   const S = ERW_STICHJAHR, out = [];
   for (const [g, jug, erw] of [['m', 'Junioren', 'Herren'], ['w', 'Juniorinnen', 'Damen']]) {
-    out.push({ id: g + 'U12', g, cat: 'jugend', short: 'U12', label: jug + ' U12', min: S - 11, max: S - 12 });
-    out.push({ id: g + 'U15', g, cat: 'jugend', short: 'U15', label: jug + ' U15', min: S - 13, max: S - 15 });
-    out.push({ id: g + 'U18', g, cat: 'jugend', short: 'U18', label: jug + ' U18', min: S - 16, max: S - 18 });
-    out.push({ id: g + '0',   g, cat: g === 'm' ? 'herren' : 'damen', short: erw, label: erw, min: S - 19, max: S - 29 });
+    const E = g === 'm' ? 'H' : 'D';
+    out.push({ id: g + 'U12', g, cat: 'jugend', short: 'U12', abbr: 'U12', label: jug + ' U12', min: S - 11, max: S - 12 });
+    out.push({ id: g + 'U15', g, cat: 'jugend', short: 'U15', abbr: 'U15', label: jug + ' U15', min: S - 13, max: S - 15 });
+    out.push({ id: g + 'U18', g, cat: 'jugend', short: 'U18', abbr: 'U18', label: jug + ' U18', min: S - 16, max: S - 18 });
+    out.push({ id: g + '0',   g, cat: g === 'm' ? 'herren' : 'damen', short: erw, abbr: E, label: erw, min: S - 19, max: S - 29 });
     for (const a of [30, 40, 50, 60])
-      out.push({ id: g + a, g, cat: g === 'm' ? 'herren' : 'damen', short: erw + ' ' + a, label: erw + ' ' + a, min: S - a, max: a === 60 ? 0 : S - a - 9 });
+      out.push({ id: g + a, g, cat: g === 'm' ? 'herren' : 'damen', short: erw + ' ' + a, abbr: E + ' ' + a, label: erw + ' ' + a, min: S - a, max: a === 60 ? 0 : S - a - 9 });
   }
+  // rank: Sortierung der AK-Spalte jung → alt, bei gleicher Stufe männlich vor weiblich
+  out.forEach((c, i) => c.rank = (i % 8) * 2 + (c.g === 'w' ? 1 : 0));
   return out; // min = jüngster Jahrgang, max = ältester (0 = ohne Grenze)
 }
 
@@ -3202,33 +3206,44 @@ function renderAltersklassen() {
   if (!_akSelected.size) { box.innerHTML = h + '<div class="status-msg">Altersklassen antippen, um die Spieler zu sehen.</div>'; return; }
   if (!_statistikData) { box.innerHTML = h + '<div class="loading-row"><div class="spinner"></div>Spieler werden geladen …</div>'; return; }
 
-  const lkVal = p => parseFloat(p.lk) || 99; // ohne LK ganz unten
-  const byName = (a, b) => a.name.localeCompare(b.name, 'de');
-  const cmp = {
-    name: byName,
-    lk:   (a, b) => ((lkVal(a) === 99) - (lkVal(b) === 99)) || (lkVal(a) - lkVal(b)) * _akSort.dir || byName(a, b),
-    year: (a, b) => ((parseInt(a.year, 10) || 0) - (parseInt(b.year, 10) || 0)) * _akSort.dir || byName(a, b)
-  };
-  const sortFn = _akSort.key === 'name' ? (a, b) => byName(a, b) * _akSort.dir : cmp[_akSort.key];
-  const th = (key, text) => `<th class="ak-sort${_akSort.key === key ? ' on' : ''}" onclick="setAkSort('${key}')">${text}${_akSort.key === key ? (_akSort.dir > 0 ? ' ▲' : ' ▼') : ''}</th>`;
-  const head = '<thead><tr>' + th('name', 'Name') + th('lk', 'LK') + th('year', 'Jahrgang') + '</tr></thead>';
+  // Eine gemeinsame Liste; jeder Spieler einmal, mit seiner Altersklasse (erste passende)
   const sel = classes.filter(c => _akSelected.has(c.id));
-  let total = 0, list = '';
-  for (const c of sel) {
-    const ps = _statistikData.filter(p => {
-      const y = parseInt(p.year, 10);
-      return y && y <= c.min && (c.max === 0 || y >= c.max) && (!p.realGender || p.realGender === c.g);
-    }).sort(sortFn);
-    total += ps.length;
-    let rows = '';
-    for (const p of ps) {
-      const lk = p.lk && p.lk !== '–' ? _fmtLK(p.lk) : '–';
-      rows += '<tr><td>' + esc(p.name) + '</td><td>' + esc(lk) + '</td><td>' + esc(String(p.year)) + '</td></tr>';
-    }
-    list += `<div class="jahrgang-box ak-box ak-${c.cat}"><div class="jahrgang-box-title">${esc(c.label)} <span class="ak-box-count">${ps.length} · ${yrs(c)}</span></div>`
-      + (ps.length ? '<table class="ak-table">' + head + '<tbody>' + rows + '</tbody></table>' : '<div class="status-msg">Keine Spieler.</div>') + '</div>';
+  const rows = [];
+  for (const p of _statistikData) {
+    const y = parseInt(p.year, 10);
+    if (!y) continue;
+    const c = sel.find(c => y <= c.min && (c.max === 0 || y >= c.max) && (!p.realGender || p.realGender === c.g));
+    if (c) rows.push({ p, c });
   }
-  box.innerHTML = h + '<div class="erw-count">' + total + ' Spieler</div>' + list;
+
+  const lkVal = r => parseFloat(r.p.lk) || 99; // ohne LK immer ganz unten
+  const byName = (a, b) => a.p.name.localeCompare(b.p.name, 'de');
+  const d = _akSort.dir;
+  const cmp = {
+    name: (a, b) => byName(a, b) * d,
+    lk:   (a, b) => ((lkVal(a) === 99) - (lkVal(b) === 99)) || (lkVal(a) - lkVal(b)) * d || byName(a, b),
+    year: (a, b) => ((parseInt(a.p.year, 10) || 0) - (parseInt(b.p.year, 10) || 0)) * d || byName(a, b),
+    ak:   (a, b) => (a.c.rank - b.c.rank) * d || ((lkVal(a) === 99) - (lkVal(b) === 99)) || (lkVal(a) - lkVal(b)) || byName(a, b),
+    g:    (a, b) => ((a.c.g === 'w') - (b.c.g === 'w')) * d || ((lkVal(a) === 99) - (lkVal(b) === 99)) || (lkVal(a) - lkVal(b)) || byName(a, b)
+  };
+  // Spalte m/w nur, wenn die Auswahl beide Geschlechter enthält
+  const mixed = new Set(sel.map(c => c.g)).size > 1;
+  if (_akSort.key === 'g' && !mixed) { _akSort.key = 'lk'; _akSort.dir = 1; }
+  rows.sort(cmp[_akSort.key]);
+
+  const th = (key, text) => `<th class="ak-sort${_akSort.key === key ? ' on' : ''}" onclick="setAkSort('${key}')">${text}${_akSort.key === key ? (d > 0 ? ' ▲' : ' ▼') : ''}</th>`;
+  const head = '<thead><tr>' + th('name', 'Name') + th('lk', 'LK') + th('year', 'Jahrgang') + th('ak', 'AK') + (mixed ? th('g', 'm/w') : '') + '</tr></thead>';
+  let body = '';
+  for (const { p, c } of rows) {
+    const lk = p.lk && p.lk !== '–' ? _fmtLK(p.lk) : '–';
+    body += '<tr><td>' + esc(p.name) + '</td><td>' + esc(lk) + '</td><td>' + esc(String(p.year))
+      + '</td><td class="ak-tag ak-' + c.cat + '">' + esc(c.abbr) + '</td>' + (mixed ? '<td>' + c.g + '</td>' : '') + '</tr>';
+  }
+  const title = sel.map(c => c.abbr + (mixed && c.cat === 'jugend' ? ' ' + c.g : '')).join(' + ');
+  box.innerHTML = h + '<div class="jahrgang-box ak-box"><div class="jahrgang-box-title">' + esc(title)
+    + ' <span class="ak-box-count">' + rows.length + ' Spieler</span></div>'
+    + (rows.length ? '<table class="ak-table">' + head + '<tbody>' + body + '</tbody></table>' : '<div class="status-msg">Keine Spieler.</div>')
+    + '</div>';
 }
 
 async function toggleAltersklasse(id) {
