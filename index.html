@@ -753,6 +753,10 @@
   .stat-table th.sort-desc::after { content: ' ▼'; font-size: 0.6em; opacity: 0.8; }
   .stat-table td { padding: 7px 6px; color: #c8cad8; border-bottom: 1px solid rgba(144,149,176,0.08); white-space: nowrap; }
   .stat-table td:first-child { color: #e8eaf0; white-space: normal; min-width: 100px; }
+  /* Spalte Nr (laufende Nummer) vor dem Namen */
+  .stat-table td.stat-nr, .stat-table th.stat-nr { width: 1%; white-space: nowrap; min-width: 0; text-align: right; padding-right: 2px; color: #c8cad8; opacity: 0.5; font-variant-numeric: tabular-nums; }
+  .stat-table th.stat-nr { color: #7a7f96; opacity: 1; }
+  .stat-table td.stat-nr + td { color: #e8eaf0; white-space: normal; min-width: 100px; }
   .stat-table tr:last-child td { border-bottom: none; }
   .stat-rank-btn { display: inline-flex; align-items: center; justify-content: center; min-width: 28px; height: 28px; padding: 0 6px; border-radius: 50px; background: rgba(200,202,216,0.15); border: none; cursor: pointer; color: #e8eaf0; font-size: 0.82rem; font-weight: 700; font-family: inherit; }
   .stat-table td:last-child { text-align: center; }
@@ -892,6 +896,11 @@
   .ak-table td:first-child { font-weight: 600; }
   .ak-table th:nth-child(n+2), .ak-table td:nth-child(n+2) { width: 1%; white-space: nowrap; text-align: right; padding-left: 12px; }
   .ak-table td:nth-child(n+2) { opacity: 0.8; font-variant-numeric: tabular-nums; }
+  /* Spalte # (laufende Nummer) vor dem Namen: Name wieder breit, links, fett */
+  .ak-table .ak-nr { width: 1%; white-space: nowrap; text-align: right; padding: 7px 6px 7px 0; font-weight: 500; opacity: 0.5; font-variant-numeric: tabular-nums; }
+  .ak-table th.ak-nr { font-size: 0.7rem; font-weight: 700; opacity: 0.55; text-transform: uppercase; letter-spacing: 0.04em; }
+  .ak-table td.ak-nr + td, .ak-table th.ak-nr + th { width: auto; white-space: normal; text-align: left; padding-left: 4px; }
+  .ak-table td.ak-nr + td { font-weight: 600; opacity: 1; }
   .ak-tag { font-weight: 700; opacity: 1 !important; }
   .ak-tag.ak-jugend { color: #84a98d; }
   .ak-tag.ak-herren { color: #8497bf; }
@@ -3051,16 +3060,16 @@ function renderAktivList() {
   document.getElementById('aktiv-nur').classList.toggle('on', _aktivNurInaktiv);
   _aktivCounts();
   if (!rows.length) { list.innerHTML = '<div class="status-msg">' + (_aktivNurInaktiv && !q ? 'Alle Spieler sind aktiv.' : 'Kein Spieler gefunden.') + '</div>'; return; }
-  let body = '';
+  let body = '', nr = 0;
   for (const p of rows) {
     const off = _isInaktiv(p);
     const lk = p.lk && p.lk !== '–' ? _fmtLK(p.lk) : '–';
     body += `<tr${off ? ' class="is-inaktiv"' : ''} data-pk="${esc(_pk(p)).replace(/"/g, '&quot;')}" onclick="toggleInaktiv(this)">`
-      + '<td>' + esc(p.name) + '</td><td>' + esc(String(p.year || '–')) + '</td><td>' + esc(lk) + '</td>'
+      + '<td class="ak-nr">' + (++nr) + '</td><td>' + esc(p.name) + '</td><td>' + esc(String(p.year || '–')) + '</td><td>' + esc(lk) + '</td>'
       + '<td class="aktiv-state">' + (off ? 'inaktiv' : 'aktiv') + '</td></tr>';
   }
   const th = (key, text) => `<th class="ak-sort${_aktivSort.key === key ? ' on' : ''}" onclick="setAktivSort('${key}')">${text}${_aktivSort.key === key ? (d > 0 ? ' ▲' : ' ▼') : ''}</th>`;
-  list.innerHTML = '<table class="ak-table aktiv-table"><thead><tr>' + th('name', 'Name') + th('year', 'Jahrg.') + th('lk', 'LK')
+  list.innerHTML = '<table class="ak-table aktiv-table"><thead><tr><th class="ak-nr">Nr</th>' + th('name', 'Name') + th('year', 'Jahrg.') + th('lk', 'LK')
     + '<th></th></tr></thead><tbody>' + body + '</tbody></table>';
 }
 function setAktivSort(key) {
@@ -3164,11 +3173,12 @@ function renderAltersklassen() {
   rows.sort(cmp[_akSort.key]);
 
   const th = (key, text) => `<th class="ak-sort${_akSort.key === key ? ' on' : ''}" onclick="setAkSort('${key}')">${text}${_akSort.key === key ? (d > 0 ? ' ▲' : ' ▼') : ''}</th>`;
-  const head = '<thead><tr>' + th('name', 'Name') + th('lk', 'LK') + th('year', 'Jahrg.') + th('ak', 'AK') + (mixed ? th('g', 'm/w') : '') + '</tr></thead>';
+  const head = '<thead><tr><th class="ak-nr">Nr</th>' + th('name', 'Name') + th('lk', 'LK') + th('year', 'Jahrg.') + th('ak', 'AK') + (mixed ? th('g', 'm/w') : '') + '</tr></thead>';
   let body = '';
+  let nr = 0;
   for (const { p, c } of rows) {
     const lk = p.lk && p.lk !== '–' ? _fmtLK(p.lk) : '–';
-    body += '<tr><td>' + esc(p.name) + '</td><td>' + esc(lk) + '</td><td>' + esc(String(p.year))
+    body += '<tr><td class="ak-nr">' + (++nr) + '</td><td>' + esc(p.name) + '</td><td>' + esc(lk) + '</td><td>' + esc(String(p.year))
       + '</td><td class="ak-tag ak-' + c.cat + '">' + esc(c.abbr) + '</td>' + (mixed ? '<td>' + c.g + '</td>' : '') + '</tr>';
   }
   const title = sel.map(c => c.abbr + (mixed && c.cat === 'jugend' ? ' ' + c.g : '')).join(' + ');
@@ -3919,15 +3929,17 @@ function renderStatistikTable(container) {
   }
 
   html += `<table class="stat-table"><thead><tr>
-    ${th('name','Name')}${th('jahrg','Jahrg.')}${th('lk','LK')}${th('gesamt','Gesamt')}${th('einzel','Einzel')}${th('doppel','Doppel')}
+    <th class="stat-nr">Nr</th>${th('name','Name')}${th('jahrg','Jahrg.')}${th('lk','LK')}${th('gesamt','Gesamt')}${th('einzel','Einzel')}${th('doppel','Doppel')}
   </tr></thead><tbody>`;
 
+  let nr = 0;
   for (const p of data) {
     const gw = p.einzelWins + p.doppelWins, gl = p.einzelLosses + p.doppelLosses;
     const ci = p.name.indexOf(',');
     const nameHtml = esc(ci >= 0 ? p.name.slice(0, ci) : p.name) + '<br><span style="font-size:0.72rem;opacity:0.75">' + esc(ci >= 0 ? p.name.slice(ci + 1).trim() : '') + '</span>';
     const badge = '<span class="gender-badge gb-' + (p.realGender === 'm' ? 'm">m' : p.realGender === 'w' ? 'w">w' : 'x">?') + '</span>';
     html += `<tr>
+      <td class="stat-nr">${++nr}</td>
       <td><div class="stat-name-cell"><div class="stat-name">${nameHtml}</div>${badge}</div></td>
       <td>${esc(p.year || '–')}</td>
       <td>${esc(_fmtLK(p.lk))}</td>
